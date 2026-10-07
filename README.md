@@ -58,6 +58,29 @@ The app is then served on port 80. Point a domain at the server, set `server_nam
 Useful commands: `sudo systemctl restart fastsales99`, `sudo journalctl -u fastsales99 -f`.
 To update: pull the new code into `/opt/fastsales99` and restart the service.
 
+### Option A2: Oracle Cloud Always Free VM (free forever)
+
+1. Sign up at https://cloud.oracle.com (card needed for verification only). Pick a home region close to you.
+2. Compute -> Instances -> Create instance. Image: **Ubuntu 22.04 or 24.04**. Shape: **VM.Standard.E2.1.Micro**
+   (Always Free) or Ampere A1. Download the SSH private key it generates. Note the public IP.
+3. Open the web ports in the cloud firewall: Networking -> Virtual Cloud Networks -> your VCN -> Subnet ->
+   Default Security List -> Add Ingress Rule: Source `0.0.0.0/0`, protocol TCP, destination port `80`.
+   Add another for port `443`.
+4. SSH in: `ssh -i path	o\key.key ubuntu@PUBLIC_IP`
+5. On the server:
+
+```bash
+sudo mkdir -p /opt/fastsales99 && sudo chown ubuntu /opt/fastsales99
+git clone https://github.com/21e51a6606-ui/fastsales99.git /opt/fastsales99   # username + GitHub token when asked
+cd /opt/fastsales99
+sudo bash deploy/install.sh          # installs everything, creates /etc/fastsales99.env
+sudo nano /etc/fastsales99.env       # set SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD; Ctrl+O, Enter, Ctrl+X
+sudo bash deploy/install.sh          # second run starts the app
+```
+
+Open `http://PUBLIC_IP` in a browser and sign in as Super Admin. To update later:
+`cd /opt/fastsales99 && git pull && sudo systemctl restart fastsales99`.
+
 ### Option B: Docker (any host, Render, Railway, Fly.io ...)
 
 ```bash

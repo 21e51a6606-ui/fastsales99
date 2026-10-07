@@ -5,7 +5,15 @@ set -euo pipefail
 APP_DIR=/opt/fastsales99
 
 apt-get update
-apt-get install -y python3 python3-venv nginx
+apt-get install -y python3 python3-venv nginx git
+
+# Oracle Cloud Ubuntu images ship with iptables rules that drop web traffic. Open 80/443.
+if command -v iptables >/dev/null && iptables -C INPUT -j REJECT --reject-with icmp-host-prohibited 2>/dev/null; then
+  iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+  DEBIAN_FRONTEND=noninteractive apt-get install -y netfilter-persistent iptables-persistent
+  netfilter-persistent save
+fi
 
 id -u fastsales >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin fastsales
 
