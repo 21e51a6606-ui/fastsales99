@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Lead Assignment - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Lead Assignment</h1><p class="sub small" style="letter-spacing:.1em;font-weight:700">ADMIN CONTROL CENTER</p></div>
+  <div class="row">{% if current_user.role != 'sales_executive' %}<button class="btn" onclick="FS.openModal('addLeadModal')"><i data-lucide="user-plus"></i> Add Lead</button><a class="btn" href="{{ url_for('leads.export_csv', **request.args) }}"><i data-lucide="download"></i> Export</a>{% endif %}
+  {% if current_user.role in ('super_admin','admin','manager') %}<button class="btn btn-primary btn-lg" onclick="FS.openModal('bulkModal')"><i data-lucide="upload"></i> Bulk Upload</button>{% endif %}</div></div>
+
+<div class="grid" style="grid-template-columns: 3fr 1fr; align-items:start">
+<div>
+  <div class="grid grid-4" style="margin-bottom:16px">
+    {% for label, val, icon in [('Incoming Leads', incoming_count, 'layers'), ('All Leads', all_count, 'check-circle'), ('High Priority', high_count, 'target'), ('Assignable Users', assignable|length, 'users')] %}
+    <div class="card" style="background:var(--primary-50);border:0;display:flex;justify-content:space-between;align-items:center"><div><div class="small muted" style="font-weight:700;letter-spacing:.08em;text-transform:uppercase">{{ label }}</div><div style="font-size:28px;font-weight:800">{{ '{:,}'.format(val) }}</div></div><i data-lucide="{{ icon }}" style="color:var(--primary);width:22px;height:22px"></i></div>
+    {% endfor %}
+  </div>
+  <div class="row between" style="margin-bottom:12px">
+    <div class="tabs"><a href="{{ url_for('leads.index', tab='incoming') }}" class="{{ 'active' if tab == 'incoming' }}">INCOMING LEADS <span class="pill pill-primary">{{ incoming_count }}</span></a><a href="{{ url_for('leads.index', tab='all') }}" class="{{ 'active' if tab == 'all' }}">ALL LEADS <span class="pill pill-gray">{{ all_count }}</span></a><a href="{{ url_for('leads.index', tab='product_move') }}" class="{{ 'active' if tab == 'product_move' }}">PRODUCT MOVE</a></div>
+    <form method="get" class="search-box" style="width:360px"><input type="hidden" name="tab" value="{{ tab }}"><i data-lucide="search"></i><input type="search" name="q" value="{{ args.get('q','') }}" placeholder="Search leads..."></form>
+  </div>
+
+  {% if tab == 'product_move' %}
+  <div class="card"><h3>Move leads between products</h3><p class="muted">Bulk re-tag leads to a different product. AI agents and teams follow the product.</p>
+    <form method="post" action="{{ url_for('leads.product_move') }}" class="inline-form mt" data-confirm="Move all matching leads? This cannot be undone."><div class="field"><label>From product</label><select name="from_product"><option value="">(no product)</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} ({{ p.leads|length }})</option>{% endfor %}</select></div><div class="field"><label>To product</label><select name="to_product" required>{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div><button class="btn btn-primary">Move leads</button></form></div>
+  {% else %}
+  <div class="card" style="padding:0">
+    <div class="row between" style="padding:14px 20px">
+      <div class="row">{% if current_user.role != 'sales_executive' %}<button class="btn btn-ghost btn-sm" style="letter-spacing:.08em;color:var(--muted)" onclick="FS.openModal('assignModal')"><i data-lucide="user-plus"></i> ASSIGN</button><button class="btn btn-soft btn-sm" id="assignSelected" disabled onclick="FS.openModal('assignModal')"><i data-lucide="check"></i> Assign Leads <span class="pill pill-primary" id="selCount">0</span></button>
+        {% if current_user.role in ('super_admin','admin','manager') and tab == 'incoming' %}<button class="btn btn-sm" onclick="autoAssign()"><i data-lucide="shuffle"></i> Auto round-robin</button>{% endif %}
+        {% if current_user.role in ('super_admin','admin') %}<button class="btn btn-sm" style="color:var(--red)" id="bulkDel" disabled onclick="bulkDelete()"><i data-lucide="trash-2"></i> Delete</button>{% endif %}{% endif %}</div>
+      <form method="get" class="row" id="filters"><input type="hidden" name="tab" value="{{ tab }}"><input type="hidden" name="q" value="{{ args.get('q','') }}">
+        <select name="priority" onchange="this.form.submit()" style="width:140px"><option value="">All Priorities</option>{% for p in ['High','Medium','Low'] %}<option {{ 'selected' if args.get('priority') == p }}>{{ p }}</option>{% endfor %}</select>
+        <select name="source" onchange="this.form.submit()" style="width:140px"><option value="">All Sources</option>{% for s in sources %}<option {{ 'selected' if args.get('source') == s }}>{{ s }}</option>{% endfor %}</select>
+        <select name="product" onchange="this.form.submit()" style="width:150px"><option value="">All Products</option>{% for p in products %}<option value="{{ p.id }}" {{ 'selected' if args.get('product')|int == p.id }}>{{ p.name }}</option>{% endfor %}</select>
+        <select name="status" onchange="this.form.submit()" style="width:150px"><option value="">All Statuses</option>{% for s in statuses %}<option {{ 'selected' if args.get('status') == s }}>{{ s }}</option>{% endfor %}</select></form>
+    </div>
+    <div class="table-wrap"><table class="table"><thead><tr><th><input type="checkbox" id="selAll"></th><th>Actions</th><th>Lead Name</th><th>Phone</th><th>Email</th><th>Status</th><th>Contacted Status</th><th>Source</th><th>Assigned</th></tr></thead><tbody>
+    {% for l in leads %}
+    <tr data-id="{{ l.id }}"><td><input type="checkbox" class="sel" value="{{ l.id }}"></td>
+      <td class="actions"><button class="btn btn-icon" title="View" onclick="viewLead({{ l.id }})"><i data-lucide="eye"></i></button><button class="btn btn-icon" title="Log call" onclick="openCall({{ l.id }}, '{{ l.name|e }}')"><i data-lucide="phone-call"></i></button><button class="btn btn-icon" title="Convert to deal" onclick="convertLead({{ l.id }})"><i data-lucide="file-text"></i></button>{% if current_user.role in ('super_admin','admin','manager') %}<button class="btn btn-icon" title="Delete" onclick="delLead({{ l.id }})"><i data-lucide="trash-2"></i></button>{% endif %}</td>
+      <td><div class="row"><span class="avatar soft">{{ l.name[:1]|upper }}</span><div><b>{{ l.name }}</b><div class="muted tiny">{{ l.email or '' }}</div></div></div></td>
+      <td class="mono" style="font-weight:700">{{ l.phone }}</td><td class="muted">{{ l.email or '-' }}</td>
+      <td><span class="pill pill-outline">{{ l.status }}</span></td>
+      <td>{% if l.contacted %}<span class="pill pill-green" style="border:1px solid var(--green)">Contacted</span><div class="muted tiny">{{ l.contacted_at|dt('%m/%d/%Y, %I:%M:%S %p') }}</div>{% else %}<span class="pill pill-gray">Pending</span>{% endif %}</td>
+      <td><span class="pill pill-outline">{{ l.source }}</span></td><td class="small">{{ l.assignee.name if l.assignee else '<span class="muted">Unassigned</span>'|safe }}</td></tr>
+    {% else %}<tr><td colspan="9" class="empty">No leads match your filters.</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="pagination" style="padding:12px 20px">{% set a = args.to_dict() %}{% if pagination.has_prev %}<a href="{{ url_for('leads.index', page=pagination.prev_num, **a) }}">‹</a>{% endif %}<span class="muted">Page {{ pagination.page }} of {{ pagination.pages or 1 }} · {{ pagination.total }} leads</span>{% if pagination.has_next %}<a href="{{ url_for('leads.index', page=pagination.next_num, **a) }}">›</a>{% endif %}</div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card"><div class="row between"><b class="small" style="letter-spacing:.08em;color:var(--primary)">RECENT ASSIGNMENT HISTORY</b><a href="{{ url_for('leads.history') }}"><i data-lucide="chevron-right"></i></a></div>
+  {% for h in history %}<div style="border-top:1px solid var(--border);padding:12px 0"><div class="muted small">● {{ h.lead.name if h.lead else 'Lead' }}</div><div style="font-weight:700">{{ h.from_user.name if h.from_user else '?' }} → {{ h.to_user.name if h.to_user else '?' }}</div><div class="muted tiny">{{ h.created_at|dt }} · {{ h.method }}</div><div class="muted tiny">{{ h.note }}</div></div>{% else %}<div class="muted small mt">No assignments yet.</div>{% endfor %}</div>
+</div>
+
+<!-- modals -->
+<div class="modal-backdrop" id="assignModal"><div class="modal"><div class="modal-head"><h3>Assign selected leads</h3><button class="icon-btn" onclick="FS.closeModal('assignModal')"><i data-lucide="x"></i></button></div>
+<p class="muted">Selected: <b id="selCount2">0</b> lead(s)</p><div class="field mt"><label>Assign to</label><select id="assignUser">{% for u in assignable %}<option value="{{ u.id }}">{{ u.name }} — {{ u.role_label }} ({{ u.leads|length }} leads)</option>{% endfor %}</select></div>
+<div class="modal-foot"><button class="btn" onclick="FS.closeModal('assignModal')">Cancel</button><button class="btn btn-primary" onclick="doAssign()">Assign</button></div></div></div>
+
+<div class="modal-backdrop" id="bulkModal"><div class="modal"><div class="modal-head"><h3>Bulk Upload Leads</h3><button class="icon-btn" onclick="FS.closeModal('bulkModal')"><i data-lucide="x"></i></button></div>
+<form method="post" action="{{ url_for('leads.bulk_upload') }}" enctype="multipart/form-data"><p class="muted small">CSV columns: <code>name, phone, email, company, source, priority</code>. <a href="{{ url_for('leads.template_csv') }}">Download template</a></p><div class="field mt"><label>CSV file</label><input type="file" name="file" accept=".csv" required></div><div class="field"><label>Tag with product</label><select name="product_id"><option value="">-</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>
+<div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('bulkModal')">Cancel</button><button class="btn btn-primary"><i data-lucide="upload"></i> Upload</button></div></form></div></div>
+
+<div class="modal-backdrop" id="addLeadModal"><div class="modal"><div class="modal-head"><h3>Add Lead</h3><button class="icon-btn" onclick="FS.closeModal('addLeadModal')"><i data-lucide="x"></i></button></div>
+<form method="post" action="{{ url_for('leads.add') }}"><div class="grid grid-2"><div class="field"><label>Name</label><input type="text" name="name" required></div><div class="field"><label>Phone</label><input type="tel" name="phone" required placeholder="+91..."></div><div class="field"><label>Email</label><input type="email" name="email"></div><div class="field"><label>Company</label><input type="text" name="company"></div>
+<div class="field"><label>Source</label><select name="source">{% for s in ['Website','Facebook','LinkedIn','Referral','WhatsApp','Walk-in','Others'] %}<option>{{ s }}</option>{% endfor %}</select></div><div class="field"><label>Priority</label><select name="priority"><option>Medium</option><option>High</option><option>Low</option></select></div>
+<div class="field"><label>Product</label><select name="product_id"><option value="">-</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div><div class="field"><label>Assign to</label><select name="assigned_to"><option value="">Unassigned</option>{% for u in assignable %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select></div></div>
+<div class="field"><label>Notes</label><textarea name="notes"></textarea></div><div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('addLeadModal')">Cancel</button><button class="btn btn-primary">Add Lead</button></div></form></div></div>
+
+<div class="modal-backdrop" id="callModal"><div class="modal"><div class="modal-head"><h3>Log call — <span id="c_name"></span></h3><button class="icon-btn" onclick="FS.closeModal('callModal')"><i data-lucide="x"></i></button></div>
+<input type="hidden" id="c_id"><div class="grid grid-2"><div class="field"><label>Call outcome</label><select id="c_status">{% for s in call_statuses %}<option>{{ s }}</option>{% endfor %}</select></div><div class="field"><label>Duration (sec)</label><input type="number" id="c_dur" value="90" min="0"></div></div><div class="field"><label>Update lead status</label><select id="c_lead_status"><option value="">(keep)</option>{% for s in statuses %}<option>{{ s }}</option>{% endfor %}</select></div><div class="field"><label>Notes</label><textarea id="c_notes"></textarea></div>
+<div class="modal-foot"><button class="btn" onclick="FS.closeModal('callModal')">Cancel</button><button class="btn btn-primary" onclick="submitCall()">Save</button></div></div></div>
+
+<div class="modal-backdrop" id="viewModal"><div class="modal wide"><div class="modal-head"><h3 id="v_title">Lead</h3><button class="icon-btn" onclick="FS.closeModal('viewModal')"><i data-lucide="x"></i></button></div><div id="v_body"></div></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const STATUSES = {{ statuses|tojson }};
+function selected() { return [...document.querySelectorAll('.sel:checked')].map(c => c.value); }
+function refreshSel() { const n = selected().length; selCount.textContent = n; selCount2.textContent = n; assignSelected.disabled = !n; const bd = document.getElementById('bulkDel'); if (bd) bd.disabled = !n; }
+document.querySelectorAll('.sel').forEach(c => c.addEventListener('change', refreshSel));
+const sa = document.getElementById('selAll'); if (sa) sa.addEventListener('change', () => { document.querySelectorAll('.sel').forEach(c => c.checked = sa.checked); refreshSel(); });
+async function doAssign() { const ids = selected(); if (!ids.length) return FS.toast('Select leads first'); try { const r = await FS.post('/dashboard/admin/lead-assignment/assign', { lead_ids: ids, user_id: assignUser.value }); FS.closeModal('assignModal'); FS.toast(`${r.assigned} leads assigned`); setTimeout(() => location.reload(), 500); } catch (e) { FS.toast(e.message); } }
+async function autoAssign() { if (!confirm('Distribute ALL unassigned leads round-robin across active sales executives?')) return; try { const r = await FS.post('/dashboard/admin/lead-assignment/auto-assign', {}); FS.toast(`${r.assigned} leads distributed to ${r.executives} executives`); setTimeout(() => location.reload(), 600); } catch (e) { FS.toast(e.message); } }
+async function bulkDelete() { const ids = selected(); if (!ids.length || !confirm(`Delete ${ids.length} leads?`)) return; await FS.post('/dashboard/admin/lead-assignment/bulk-delete', { lead_ids: ids }); location.reload(); }
+async function delLead(id) { if (!confirm('Delete this lead?')) return; await FS.post(`/dashboard/admin/lead-assignment/${id}/delete`, {}); location.reload(); }
+function openCall(id, name) { c_id.value = id; c_name.textContent = name; FS.openModal('callModal'); }
+async function submitCall() { try { const r = await FS.post(`/dashboard/admin/lead-assignment/${c_id.value}/call`, { status: c_status.value, duration: c_dur.value, notes: c_notes.value, lead_status: c_lead_status.value }); FS.closeModal('callModal'); FS.toast('Call logged — ' + r.call.status); setTimeout(() => location.reload(), 500); } catch (e) { FS.toast(e.message); } }
+async function convertLead(id) { const v = prompt('Deal value (₹)', '49999'); if (v === null) return; try { const r = await FS.post(`/dashboard/admin/lead-assignment/${id}/convert`, { value: v }); FS.toast('Deal created: ' + r.deal.title); } catch (e) { FS.toast(e.message); } }
+async function viewLead(id) {
+  const r = await FS.get(`/dashboard/admin/lead-assignment/${id}`); const l = r.lead;
+  v_title.textContent = l.name;
+  v_body.innerHTML = `<form onsubmit="return saveLead(event, ${l.id})"><div class="grid grid-3">
+    <div class="field"><label>Phone</label><input type="text" name="phone" value="${FS.esc(l.phone || '')}"></div><div class="field"><label>Email</label><input type="email" name="email" value="${FS.esc(l.email || '')}"></div><div class="field"><label>Company</label><input type="text" name="company" value="${FS.esc(l.company || '')}"></div>
+    <div class="field"><label>Status</label><select name="status">${STATUSES.map(s => `<option ${s === l.status ? 'selected' : ''}>${s}</option>`).join('')}</select></div><div class="field"><label>Priority</label><select name="priority">${['High', 'Medium', 'Low'].map(s => `<option ${s === l.priority ? 'selected' : ''}>${s}</option>`).join('')}</select></div><div class="field"><label>Score (0-100)</label><input type="number" name="score" value="${l.score}" min="0" max="100"></div></div>
+    <div class="field"><label>Notes</label><textarea name="notes">${FS.esc(r.notes || '')}</textarea></div><div class="row between"><span class="muted small">Source: ${FS.esc(l.source)} · Product: ${FS.esc(l.product || '-')} · Assigned: ${FS.esc(l.assignee || 'Unassigned')} · Created ${FS.fmtDate(l.created_at)}</span><button class="btn btn-primary">Save</button></div></form>
+    <div class="grid grid-2 mt"><div><h4>Calls (${r.calls.length})</h4>${r.calls.slice(0, 6).map(c => `<div class="list-item"><span class="pill status-${c.status}">${c.status}</span><span>${c.duration}</span><span class="muted small" style="margin-left:auto">${FS.fmtDate(c.created_at)}</span></div>`).join('') || '<div class="muted small">No calls.</div>'}</div>
+    <div><h4>Assignment history</h4>${r.history.map(h => `<div class="list-item small"><b>${FS.esc(h.from || '?')} → ${FS.esc(h.to || '?')}</b><span class="muted" style="margin-left:auto">${FS.fmtDate(h.at)}</span></div>`).join('') || '<div class="muted small">No history.</div>'}
+    <h4 class="mt">Deals</h4>${r.deals.map(d => `<div class="list-item small"><b>${FS.esc(d.title)}</b><span class="pill pill-primary">${d.stage_label}</span><span class="mono" style="margin-left:auto">${FS.inr(d.value)}</span></div>`).join('') || '<div class="muted small">No deals.</div>'}</div></div>`;
+  FS.openModal('viewModal');
+}
+async function saveLead(e, id) { e.preventDefault(); const data = Object.fromEntries(new FormData(e.target).entries()); try { await FS.post(`/dashboard/admin/lead-assignment/${id}/update`, data); FS.toast('Lead saved'); setTimeout(() => location.reload(), 400); } catch (err) { FS.toast(err.message); } return false; }
+</script>
+{% endblock %}

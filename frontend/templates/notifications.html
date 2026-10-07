@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Notifications - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Notifications</h1><p class="sub">Bulletins, alerts and system messages.</p></div><button class="btn" onclick="FS.post('/notifications/read-all',{}).then(()=>location.reload())"><i data-lucide="check-check"></i> Mark all read</button></div>
+<div class="card">{% for n in rows %}<div class="list-item" style="{{ 'opacity:.6' if n.is_read }}"><span class="icon-bubble {{ 'bub-amber' if n.level == 'warning' else ('bub-red' if n.level == 'critical' else 'bub-primary') }}"><i data-lucide="{{ 'alert-triangle' if n.level != 'info' else 'bell' }}"></i></span><div style="flex:1"><b>{{ n.title }}</b><div class="muted small">{{ n.body }}</div></div><span class="muted small">{{ n.created_at|timeago }}</span></div>{% else %}<div class="empty">You are all caught up.</div>{% endfor %}</div>
+{% endblock %}

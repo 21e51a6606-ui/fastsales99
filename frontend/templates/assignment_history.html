@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Assignment History - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Assignment History</h1><p class="sub">Every lead hand-off, newest first.</p></div><a class="btn" href="{{ url_for('leads.index') }}"><i data-lucide="arrow-left"></i> Back</a></div>
+<div class="card" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>When</th><th>Lead</th><th>From</th><th>To</th><th>Method</th><th>Note</th></tr></thead><tbody>{% for h in rows %}<tr><td class="muted small">{{ h.created_at|dt }}</td><td class="name">{{ h.lead.name if h.lead else '-' }}</td><td>{{ h.from_user.name if h.from_user else '-' }}</td><td>{{ h.to_user.name if h.to_user else '-' }}</td><td><span class="pill pill-outline">{{ h.method }}</span></td><td class="muted small">{{ h.note }}</td></tr>{% else %}<tr><td colspan="6" class="empty">No history.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

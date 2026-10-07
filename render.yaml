@@ -1,0 +1,24 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# In Render: New -> Blueprint -> pick this repo. Fill ADMIN_EMAIL / ADMIN_PASSWORD when prompted.
+services:
+  - type: web
+    name: fastsales99
+    runtime: docker
+    plan: starter            # persistent disks need a paid instance; free tier wipes SQLite on every deploy
+    region: singapore        # closest to India; change if you prefer
+    healthCheckPath: /api/v1/ping
+    disk:
+      name: fastsales-data
+      mountPath: /app/backend/instance
+      sizeGB: 1
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_NAME
+        value: Administrator
+      - key: ADMIN_EMAIL
+        sync: false          # you enter this in the Render dashboard
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: "2"

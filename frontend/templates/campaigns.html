@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Campaigns - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1 style="font-size:34px">Campaigns</h1><p class="sub">Full-scale program management &amp; execution</p></div>
+<form method="get" class="row"><div class="search-box" style="width:420px"><i data-lucide="search"></i><input type="search" name="q" value="{{ q }}" placeholder="Search programs..."></div><select name="status" style="width:150px" onchange="this.form.submit()"><option value="">All Status</option>{% for s in ['Draft','Active','Paused','Completed'] %}<option {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}</select>{% if current_user.role in ('super_admin','admin','manager') %}<button type="button" class="btn btn-primary btn-lg" onclick="FS.openModal('addModal')"><i data-lucide="plus"></i> Add Campaign</button>{% endif %}</form></div>
+<div class="grid grid-5">
+  {% for v, l, icon, c in [(totals.total,'Total Campaigns','box','blue'),(totals.active,'Active Campaigns','megaphone','primary'),(totals.audience,'Total Audience','users','blue'),(totals.engagement ~ '%','Engagement Rate','activity','amber'),(totals.outcomes,'Total Outcome','target','green')] %}
+  <div class="card row"><span class="icon-bubble bub-{{ c }}"><i data-lucide="{{ icon }}"></i></span><div><div style="font-size:26px;font-weight:800">{{ v }}</div><div class="muted">{{ l }}</div></div></div>{% endfor %}
+</div>
+<div class="tabs" style="margin:18px 0"><a href="?tab=active" class="{{ 'active' if tab == 'active' }}">Active Campaigns</a><a href="?tab=history" class="{{ 'active' if tab == 'history' }}">Campaign History</a></div>
+<div class="card" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Campaign Identity &amp; Strategy</th><th>Status</th><th>Progress</th><th>Outcomes</th><th>Live Engagement</th><th></th></tr></thead><tbody>
+{% for c in (active if tab == 'active' else history) %}
+<tr><td><b style="font-size:15px">{{ c.name }}</b><div class="muted small">{{ c.channel }} · {{ c.product.name if c.product else 'All products' }} · {{ c.start_date or '-' }} → {{ c.end_date or '-' }}</div><div class="muted small">{{ c.strategy or '' }}</div></td>
+<td><span class="pill status-{{ c.status }}">{{ c.status }}</span></td>
+<td style="min-width:180px"><div class="progress"><span style="width:{{ c.progress }}%"></span></div><div class="small muted">{{ c.sent }} / {{ c.audience_size }} ({{ c.progress }}%)</div></td>
+<td><b>{{ c.outcomes }}</b> <span class="muted small">conversions</span></td><td><b>{{ c.engaged }}</b> <span class="muted small">engaged · {{ c.engagement_rate }}%</span></td>
+<td class="actions">{% if current_user.role in ('super_admin','admin','manager') %}
+  {% if c.status in ('Draft','Paused') %}<button class="btn btn-sm btn-primary" onclick="setStatus({{ c.id }}, 'Active')"><i data-lucide="play"></i> Start</button>{% endif %}
+  {% if c.status == 'Active' %}<button class="btn btn-sm" onclick="runBatch({{ c.id }})"><i data-lucide="send"></i> Dispatch 25</button><button class="btn btn-sm" onclick="setStatus({{ c.id }}, 'Paused')"><i data-lucide="pause"></i></button>{% endif %}
+  {% if c.status != 'Completed' %}<button class="btn btn-sm" onclick="setStatus({{ c.id }}, 'Completed')">End</button>{% endif %}
+  {% if current_user.role in ('super_admin','admin') %}<form method="post" action="{{ url_for('campaigns.delete', cid=c.id) }}" data-confirm="Delete campaign?"><button class="btn btn-icon"><i data-lucide="trash-2"></i></button></form>{% endif %}{% endif %}</td></tr>
+{% else %}<tr><td colspan="6" class="empty">No {{ 'active' if tab == 'active' else 'completed' }} campaigns found.</td></tr>{% endfor %}</tbody></table></div></div>
+
+<div class="modal-backdrop" id="addModal"><div class="modal"><div class="modal-head"><h3>Add Campaign</h3><button class="icon-btn" onclick="FS.closeModal('addModal')"><i data-lucide="x"></i></button></div>
+<form method="post" action="{{ url_for('campaigns.add') }}"><div class="field"><label>Name</label><input type="text" name="name" required></div><div class="grid grid-2"><div class="field"><label>Channel</label><select name="channel">{% for ch in channels %}<option>{{ ch }}</option>{% endfor %}</select></div><div class="field"><label>Product</label><select name="product_id"><option value="">All products</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>
+<div class="field"><label>Audience segment</label><select name="segment"><option value="all">All leads</option><option value="uncontacted">Not yet contacted</option><option value="interested">Interested / Follow up</option><option value="high">High priority</option></select></div><div class="field"><label>Start</label><input type="date" name="start_date"></div><div class="field"><label>End</label><input type="date" name="end_date"></div></div>
+<div class="field"><label>Strategy</label><input type="text" name="strategy" placeholder="e.g. Re-engage contacted leads with cohort offer"></div>
+<div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('addModal')">Cancel</button><button class="btn btn-primary">Create</button></div></form></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function setStatus(id, status) { try { await FS.post(`/campaigns/${id}/status`, { status }); location.reload(); } catch (e) { FS.toast(e.message); } }
+async function runBatch(id) { try { const r = await FS.post(`/campaigns/${id}/run`, { batch: 25 }); FS.toast(`Dispatched ${r.sent}, ${r.engaged} engaged (${r.progress}%)`); setTimeout(() => location.reload(), 700); } catch (e) { FS.toast(e.message); } }
+</script>
+{% endblock %}

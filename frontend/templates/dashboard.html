@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Genailakes — Admin{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ 'Admin' if current_user.role in ('super_admin','admin') else current_user.role_label }} Dashboard</h1><p class="sub">Comprehensive overview of users, operations, products, and financials.</p></div>
+  {% if current_user.role in ('super_admin','admin') %}<button class="btn btn-primary btn-lg" onclick="FS.openModal('bulletinModal')"><i data-lucide="megaphone"></i> Bulletin</button>{% endif %}
+</div>
+
+<div class="grid grid-4">
+  <div class="card kpi">
+    <div class="label">Total Active Users <span class="icon-bubble bub-primary"><i data-lucide="users"></i></span></div>
+    <div class="value">{{ active_users }}</div>
+    <div class="row" style="gap:6px"><span class="pill pill-primary">{{ role_counts.get('manager',0) }} Managers</span><span class="pill pill-green">{{ role_counts.get('team_lead',0) }} Leads</span><span class="pill pill-green">{{ role_counts.get('sales_executive',0) }} Execs</span><a href="{{ url_for('employees.index') }}" class="icon-btn" style="margin-left:auto"><i data-lucide="chevron-down"></i></a></div>
+  </div>
+  <div class="card kpi">
+    <div class="label">Total Calls (MTD) <span class="icon-bubble bub-green"><i data-lucide="phone-call"></i></span></div>
+    <div class="value">{{ calls_mtd }}</div>
+    <div class="foot"><span class="{{ 'ok' if connect_rate >= 30 else 'warn' }}">Connect Rate: {{ connect_rate }}%</span><span>Leads: {{ leads_mtd }}</span><a href="{{ url_for('analytics.index') }}" style="margin-left:auto"><i data-lucide="chevron-up"></i></a></div>
+  </div>
+  <div class="card kpi">
+    <div class="label">Total System Wallet <span class="icon-bubble bub-purple"><i data-lucide="wallet"></i></span></div>
+    <div class="value">INR {{ '{:,.0f}'.format(wallet_total or 0) }}</div>
+    <div class="foot"><span>Transactions: {{ tx_count }}</span></div>
+  </div>
+  <div class="card kpi">
+    <div class="label">Gross Revenue (YTD) <span class="icon-bubble bub-green"><i data-lucide="trending-up"></i></span></div>
+    <div class="value">INR {{ revenue_ytd|inr(True)|replace('₹','') }}</div>
+    <div class="foot">{% set mx = spark|max or 1 %}<div class="sparkline">{% for v in spark %}<span style="height:{{ (100 * v / mx)|round|int if mx else 10 }}%"></span>{% endfor %}</div><span class="ok" style="margin-left:auto">{% if spark|length > 1 and spark[-2] %}{{ ((spark[-1]-spark[-2])/spark[-2]*100)|round|int }}% MoM{% else %}+18% YOY{% endif %}</span></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px" id="recentCallsCard">
+  <div class="card-head"><h3><i data-lucide="activity" style="color:var(--green)"></i> Recent System Calls</h3><button class="icon-btn" onclick="document.getElementById('recentCallsCard').style.display='none'"><i data-lucide="x"></i></button></div>
+  {% if recent_calls %}
+  <div class="grid grid-3">
+    {% for c in recent_calls %}
+    <div class="call-card"><div><div class="nm">{{ c.contact_name }}</div><div class="ph"><i data-lucide="phone" style="width:14px"></i> {{ c.phone }}</div></div><span class="pill pill-outline">{{ c.status }}</span></div>
+    {% endfor %}
+  </div>
+  {% else %}<div class="empty">No calls logged yet.</div>{% endif %}
+</div>
+
+<div class="section-title">Financials: Wallet &amp; Payments</div>
+<div class="grid" style="grid-template-columns: 2fr 3fr">
+  <div class="card">
+    <div class="card-head"><h3>Recent Payments</h3><a href="{{ url_for('payments.index') }}">View All</a></div>
+    {% if recent_payments %}{% for p in recent_payments %}
+      <div class="list-item"><span class="icon-bubble bub-green"><i data-lucide="credit-card"></i></span><div style="flex:1"><div style="font-weight:700">{{ p.description or 'Payment' }} <span class="muted small">· {{ p.reference }}</span></div><div class="muted small">{{ p.method }} · {{ p.created_at|dt }}</div></div><div style="font-weight:800">{{ p.amount|inr }}</div><span class="pill status-{{ p.status }}">{{ p.status }}</span></div>
+    {% endfor %}{% else %}<div class="empty">No payment transactions found.</div>{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-head"><div><h3>Wallet History Trend</h3><div class="muted small">Balance vs Daily Spend</div></div><span class="pill pill-purple" style="border:1px solid var(--purple)">Active</span></div>
+    {% if wallet_trend %}<div class="chart-box"><canvas id="walletChart"></canvas></div>{% else %}<div class="empty">No wallet trend data available.</div>{% endif %}
+  </div>
+</div>
+
+<div class="section-title">Product Performance Overview</div>
+<div class="grid" style="grid-template-columns: 2fr 3fr">
+  <div class="card"><h3>Deals Share</h3>{% if deals_by_product %}<div class="chart-box"><canvas id="dealsShare"></canvas></div>{% else %}<div class="empty">No deals yet.</div>{% endif %}</div>
+  <div class="card"><h3>Revenue by Product</h3>{% if revenue_by_product %}<div class="chart-box"><canvas id="revProduct"></canvas></div>{% else %}<div class="empty">No closed revenue yet.</div>{% endif %}</div>
+</div>
+
+<div class="section-title">Recent Call Logs Overview</div>
+<div class="card" style="padding:0">
+  <div class="card-head" style="padding:20px 20px 10px;margin:0"><h3><i data-lucide="phone-call" style="color:var(--green)"></i> Live Call Feed</h3><span class="pill pill-green" style="border:1px solid var(--green)" id="feedStatus">Auto-refresh Active</span></div>
+  <div class="table-wrap"><table class="table"><thead><tr><th>Caller Identity</th><th>Phone Number</th><th>Status</th><th>Duration</th><th>Date/Time</th></tr></thead>
+  <tbody id="liveFeed">{% for c in live_feed %}<tr><td class="name">{{ c.contact_name }}</td><td class="mono">{{ c.phone }}</td><td><span class="pill status-{{ c.status }}">{{ c.status }}</span></td><td>{{ c.duration_label }}</td><td class="muted">{{ c.created_at|dt }}</td></tr>{% else %}<tr><td colspan="5" class="empty">No calls yet.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+
+<div class="section-title">Activity &amp; Priority Alerts</div>
+<div class="grid" style="grid-template-columns: 2fr 3fr">
+  <div>
+    {% for level, text in alerts %}
+    <div class="card" style="display:flex;align-items:center;gap:14px;margin-bottom:12px;padding:16px 20px">
+      <span class="icon-bubble {{ 'bub-red' if level == 'critical' else ('bub-amber' if level == 'warning' else 'bub-green') }}"><i data-lucide="{{ 'alert-triangle' if level == 'critical' else ('shield-alert' if level == 'warning' else 'check-circle') }}"></i></span>
+      <div style="flex:1;font-weight:600">{{ text }}</div>
+      <span class="pill {{ 'pill-red' if level == 'critical' else ('pill-amber' if level == 'warning' else 'pill-green') }}" style="border:1px solid currentColor">{{ level|upper }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="card"><h3 style="margin-bottom:8px">Recent System Activities</h3>
+    {% for c in recent_calls[:8] %}
+    <div class="list-item"><span class="icon-bubble {{ 'bub-red' if c.status == 'Failed' else ('bub-amber' if c.status in ('Busy','No Answer') else 'bub-green') }}"><i data-lucide="{{ 'alert-triangle' if c.status == 'Failed' else ('shield-alert' if c.status != 'Connected' else 'check-circle') }}"></i></span><div style="flex:1;font-weight:600">Call with {{ c.contact_name }} marked {{ c.status }}</div><span class="muted small">{{ c.created_at|timeago }}</span></div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="section-title">AI Agents Overview</div>
+<div class="grid grid-2">
+  <div class="card"><h3>Agent Status Split</h3><div class="chart-box"><canvas id="agentSplit"></canvas></div><div class="legend"><span style="--c:#10b981">Active</span><span style="--c:#f59e0b">Inactive</span><span style="--c:#ef4444">Unassigned Products</span></div></div>
+  <div class="card"><h3>AI Agent Names</h3><div class="row" style="margin:10px 0"><span class="pill pill-green" style="border:1px solid var(--green)">Total: {{ agents|length }}</span><span class="pill pill-primary" style="border:1px solid var(--primary)">Updated in 24h: {{ agents_updated_24h }}</span></div>
+    {% for a in agents %}<div style="border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;max-width:520px"><b>{{ a.name }}</b><span class="pill status-{{ a.status }}">{{ a.status }}</span></div>{% endfor %}
+    <a href="{{ url_for('agents.index') }}">Open AI Agents →</a></div>
+</div>
+
+<div class="section-title">Management Modules</div>
+<div class="grid grid-4">
+  {% for ep, label, icon, desc in [('employees.index','Employees','users','Hierarchy & personnel'),('leads.index','Lead Assignment','target','Distribute incoming leads'),('products.index','Products','package','Inventory & teams'),('campaigns.index','Campaigns','megaphone','Outreach programs'),('payments.index','Payments','credit-card','Invoices & wallet'),('audit.index','Audit Logs','activity','Track every action'),('apikeys.index','API Keys','key-round','Integrations'),('main.settings','Settings','settings','Preferences & providers')] %}
+  <a class="card" href="{{ url_for(ep) }}" style="display:flex;gap:14px;align-items:center;color:inherit"><span class="icon-bubble bub-primary"><i data-lucide="{{ icon }}"></i></span><div><b>{{ label }}</b><div class="muted small">{{ desc }}</div></div></a>
+  {% endfor %}
+</div>
+
+<div class="modal-backdrop" id="bulletinModal"><div class="modal"><div class="modal-head"><h3>Send Bulletin</h3><button class="icon-btn" onclick="FS.closeModal('bulletinModal')"><i data-lucide="x"></i></button></div>
+  <form method="post" action="{{ url_for('main.bulletin') }}"><div class="field"><label>Title</label><input type="text" name="title" required placeholder="e.g. Month-end target push"></div><div class="field"><label>Message</label><textarea name="body" placeholder="Visible to all active users as a notification"></textarea></div><div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('bulletinModal')">Cancel</button><button class="btn btn-primary">Send to all users</button></div></form></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const walletTrend = {{ wallet_trend|tojson }};
+const dealsShare = {{ deals_by_product|tojson }};
+const revProduct = {{ revenue_by_product|tojson }};
+const agentSplit = {{ agent_split|tojson }};
+Chart.defaults.font.family = "Inter, system-ui, sans-serif"; Chart.defaults.color = "#6b7280";
+if (walletTrend.length) new Chart(document.getElementById('walletChart'), { type: 'line', data: { labels: walletTrend.map(w => w.date), datasets: [
+  { label: 'Balance', data: walletTrend.map(w => w.balance), borderColor: '#5b4fe8', backgroundColor: 'rgba(91,79,232,.12)', fill: true, tension: .35 },
+  { label: 'Daily Spend', data: walletTrend.map(w => w.spend), borderColor: '#ef4444', tension: .35 }] },
+  options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { ticks: { callback: v => FS.inr(v, true) } } } } });
+if (dealsShare.length) new Chart(document.getElementById('dealsShare'), { type: 'doughnut', data: { labels: dealsShare.map(d => d[0]), datasets: [{ data: dealsShare.map(d => d[1]), backgroundColor: FS.chartColors, borderWidth: 2 }] }, options: { maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom' } } } });
+if (revProduct.length) new Chart(document.getElementById('revProduct'), { type: 'bar', data: { labels: revProduct.map(d => d[0]), datasets: [{ data: revProduct.map(d => d[1]), backgroundColor: '#5b4fe8', borderRadius: 8 }] }, options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { callback: v => FS.inr(v, true) } } } } });
+new Chart(document.getElementById('agentSplit'), { type: 'doughnut', data: { labels: Object.keys(agentSplit), datasets: [{ data: Object.values(agentSplit), backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 2 }] }, options: { maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false } } } });
+// live feed polling
+setInterval(async () => { try { const rows = await FS.get('/dashboard/live-feed'); document.getElementById('liveFeed').innerHTML = rows.map(c => `<tr><td class="name">${FS.esc(c.contact_name)}</td><td class="mono">${FS.esc(c.phone)}</td><td><span class="pill status-${c.status}">${c.status}</span></td><td>${c.duration}</td><td class="muted">${FS.fmtDate(c.created_at)}</td></tr>`).join(''); } catch (e) { document.getElementById('feedStatus').textContent = 'Auto-refresh Paused'; } }, 15000);
+</script>
+{% endblock %}

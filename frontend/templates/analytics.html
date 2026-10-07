@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Analytics - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Summary Snapshot</h1><p class="sub">Compact view of the main operating metrics from backend analytics.</p></div>
+<form method="get" class="row"><div class="btn-group">{% for r, l in [('7','Last 7 days'),('30','Last 30 days'),('90','Last 90 days')] %}<a href="?range={{ r }}" class="{{ 'active' if rng == r }}">{{ l }}</a>{% endfor %}<button type="button" class="{{ 'active' if rng == 'custom' }}" onclick="document.getElementById('custom').classList.toggle('hidden')">Custom</button></div>
+<div class="row {{ '' if rng == 'custom' else 'hidden' }}" id="custom"><input type="hidden" name="range" value="custom"><input type="date" name="start" value="{{ start }}" style="width:150px"><input type="date" name="end" value="{{ end }}" style="width:150px"><button class="btn btn-sm">Go</button></div></form></div>
+{% set d = data %}
+<div class="grid grid-4">
+  {% for label, value, sub, badge, color in [
+    ('Total Calls', d.total_calls, 'Target: ' ~ d.call_target, d.call_pct ~ '% of target', 'primary'),
+    ('Connected Calls', d.connected, 'Calls that successfully connected', d.conn_rate ~ '%', 'green'),
+    ('Connection Rate', d.conn_rate ~ '%', 'Connected calls divided by total calls', d.conn_rate ~ '%', 'primary'),
+    ('Total Leads', d.total_leads, 'Leads worked in the selected period', d.conv_rate ~ '%', 'amber'),
+    ('Leads Converted', d.converted, 'Target: ' ~ d.conv_target, d.conv_pct ~ '% of target', 'primary'),
+    ('Conversion Rate', d.conv_rate ~ '%', 'Converted leads divided by total leads', d.conv_rate ~ '%', 'green'),
+    ('Average QA Score', d.avg_qa, 'Average quality review score across calls', (d.avg_qa * 10) ~ '%', 'primary'),
+    ('Average Call Duration', (d.avg_dur // 60) ~ 'm ' ~ (d.avg_dur % 60) ~ 's', 'Average connected call length', (d.avg_dur // 60) ~ 'm ' ~ (d.avg_dur % 60) ~ 's', 'amber')] %}
+  <div class="card kpi" style="min-height:120px"><div class="label">{{ label }} <span class="icon-bubble bub-{{ color }}"><i data-lucide="phone-call"></i></span></div><div class="value">{{ value }}</div><div class="row between"><span class="muted small">{{ sub }}</span><span class="pill pill-{{ color }}" style="border:1px solid currentColor">{{ badge }}</span></div></div>
+  {% endfor %}
+</div>
+<div class="card" style="margin-top:16px"><div class="card-head"><div><h2>Performance Trends</h2><p class="muted">Readable trends for call activity, lead volume, and key rates.</p></div></div>
+  <div class="btn-group" style="margin-bottom:14px"><button class="active" id="btnVol" onclick="showTrend('vol')">Call and Lead Volume</button><button id="btnRate" onclick="showTrend('rate')">Connection and Conversion</button></div>
+  <div class="chart-box tall"><canvas id="trend"></canvas></div></div>
+<div class="grid grid-3" style="margin-top:16px">
+  <div class="card"><h3>Call outcomes</h3><div class="chart-box"><canvas id="outcomes"></canvas></div></div>
+  <div class="card"><h3>Lead status</h3><div class="chart-box"><canvas id="leadStatus"></canvas></div></div>
+  <div class="card"><h3>Lead sources</h3><div class="chart-box"><canvas id="sources"></canvas></div></div>
+</div>
+<div class="card" style="margin-top:16px;padding:0"><div class="card-head" style="padding:20px 20px 6px"><h3>Rep leaderboard</h3></div><div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Rep</th><th>Role</th><th>Leads</th><th>Calls</th><th>Connected</th><th>Connect rate</th><th>Revenue won</th></tr></thead><tbody>
+{% for r in d.board %}<tr><td>{{ loop.index }}</td><td class="name">{{ r.name }}</td><td class="muted">{{ r.role }}</td><td>{{ r.leads }}</td><td>{{ r.calls }}</td><td>{{ r.connected }}</td><td><div class="progress" style="width:120px;display:inline-block;vertical-align:middle"><span style="width:{{ r.rate }}%"></span></div> {{ r.rate }}%</td><td class="mono">{{ r.won|inr }}</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const D = {{ data|tojson }};
+Chart.defaults.font.family = "Inter, system-ui, sans-serif"; Chart.defaults.color = "#6b7280";
+const labels = D.series.map(s => s.date.slice(5));
+let trend;
+function showTrend(kind) {
+  btnVol.classList.toggle('active', kind === 'vol'); btnRate.classList.toggle('active', kind === 'rate');
+  if (trend) trend.destroy();
+  const ds = kind === 'vol' ? [
+    { label: 'Calls', data: D.series.map(s => s.calls), borderColor: '#5b4fe8', backgroundColor: 'rgba(91,79,232,.12)', fill: true, tension: .35 },
+    { label: 'Connected', data: D.series.map(s => s.connected), borderColor: '#10b981', tension: .35 },
+    { label: 'Leads', data: D.series.map(s => s.leads), borderColor: '#f59e0b', tension: .35 }] : [
+    { label: 'Connection rate %', data: D.series.map(s => s.conn_rate), borderColor: '#5b4fe8', tension: .35 },
+    { label: 'Conversion rate %', data: D.series.map(s => s.conv_rate), borderColor: '#10b981', tension: .35 }];
+  trend = new Chart(document.getElementById('trend'), { type: 'line', data: { labels, datasets: ds }, options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } } });
+}
+showTrend('vol');
+const dough = (id, obj, colors) => new Chart(document.getElementById(id), { type: 'doughnut', data: { labels: Object.keys(obj), datasets: [{ data: Object.values(obj), backgroundColor: colors || FS.chartColors, borderWidth: 2 }] }, options: { maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom' } } } });
+dough('outcomes', D.status_split, ['#10b981', '#ef4444', '#f59e0b', '#3b82f6']); dough('leadStatus', D.lead_status); dough('sources', D.source_split);
+</script>
+{% endblock %}

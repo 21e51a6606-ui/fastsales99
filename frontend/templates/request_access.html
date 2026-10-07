@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Request access - FastSales99{% endblock %}
+{% block content %}
+<div style="max-width:520px;margin:60px auto"><div class="card"><a class="brand" href="/"><span class="logo">G</span>Gen<em>ai</em>lakes</a><h2 class="mt">Request Access</h2><p class="muted">An administrator will review and activate your account.</p>
+<form method="post" class="mt"><div class="field"><label>Full name</label><input type="text" name="name" required></div><div class="field"><label>Email</label><input type="email" name="email" required></div><div class="field"><label>Phone</label><input type="tel" name="phone"></div><button class="btn btn-primary" style="width:100%;justify-content:center">Submit request</button></form>
+<p class="muted small mt"><a href="{{ url_for('auth.login') }}">← Back to sign in</a></p></div></div>
+{% endblock %}

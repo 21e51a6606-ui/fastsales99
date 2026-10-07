@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Profile - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>My Profile</h1><p class="sub">{{ current_user.role_label }} · {{ current_user.department }}</p></div></div>
+<div class="grid" style="grid-template-columns:1fr 2fr;align-items:start">
+<div class="card" style="text-align:center"><span class="avatar lg" style="margin:0 auto 12px;width:72px;height:72px;font-size:24px">{{ current_user.initials }}</span><h3>{{ current_user.name }}</h3><div class="muted">{{ current_user.email }}</div><div class="grid grid-3 mt">{% for v, l in [(my_leads,'Leads'),(my_deals,'Deals'),(my_calls,'Calls')] %}<div><div style="font-size:22px;font-weight:800">{{ v }}</div><div class="muted small">{{ l }}</div></div>{% endfor %}</div></div>
+<form method="post" class="card"><h3>Edit details</h3><div class="grid grid-2 mt"><div class="field"><label>Full name</label><input type="text" name="name" value="{{ current_user.name }}"></div><div class="field"><label>Phone</label><input type="tel" name="phone" value="{{ current_user.phone or '' }}"></div></div><div class="field"><label>Email</label><input type="email" value="{{ current_user.email }}" disabled></div><button class="btn btn-primary">Save</button></form></div>
+{% endblock %}

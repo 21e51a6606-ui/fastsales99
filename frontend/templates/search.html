@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Search - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Search results</h1><p class="sub">for “{{ q }}”</p></div></div>
+<div class="grid grid-2">
+<div class="card"><h3>Leads ({{ results.leads|length }})</h3>{% for l in results.leads %}<div class="list-item"><div style="flex:1"><b>{{ l.name }}</b><div class="mono small muted">{{ l.phone }} · {{ l.email or '' }}</div></div><span class="pill pill-outline">{{ l.status }}</span><a class="btn btn-sm" href="{{ url_for('leads.index', tab='all', q=l.phone) }}">Open</a></div>{% else %}<div class="muted small mt">No leads.</div>{% endfor %}</div>
+<div class="card"><h3>Deals ({{ results.deals|length }})</h3>{% for d in results.deals %}<div class="list-item"><div style="flex:1"><b>{{ d.title }}</b><div class="small muted">{{ d.stage_label }} · {{ d.owner or '-' }}</div></div><span class="mono">{{ d.value|inr }}</span><a class="btn btn-sm" href="{{ url_for('deals.index', view='table', q=d.title) }}">Open</a></div>{% else %}<div class="muted small mt">No deals.</div>{% endfor %}</div>
+<div class="card"><h3>People ({{ results.users|length }})</h3>{% for u in results.users %}<div class="list-item"><div style="flex:1"><b>{{ u.name }}</b><div class="small muted">{{ u.email }}</div></div><span class="pill pill-primary">{{ u.role_label }}</span></div>{% else %}<div class="muted small mt">No people.</div>{% endfor %}</div>
+<div class="card"><h3>Products ({{ results.products|length }})</h3>{% for p in results.products %}<div class="list-item"><div style="flex:1"><b>{{ p.name }}</b><div class="small muted">{{ p.sku }}</div></div><span class="pill status-{{ p.status }}">{{ p.status }}</span><a class="btn btn-sm" href="{{ url_for('products.index', q=p.sku) }}">Open</a></div>{% else %}<div class="muted small mt">No products.</div>{% endfor %}</div>
+</div>
+{% endblock %}

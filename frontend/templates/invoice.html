@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ inv.number }} - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head no-print"><a class="btn" href="{{ url_for('payments.index', tab='invoices') }}"><i data-lucide="arrow-left"></i> Back</a><button class="btn btn-primary" onclick="window.print()"><i data-lucide="printer"></i> Print / PDF</button></div>
+<div class="card" style="max-width:800px;margin:0 auto;padding:40px"><div class="row between"><a class="brand"><span class="logo">G</span>Gen<em>ai</em>lakes</a><div style="text-align:right"><h2>INVOICE</h2><div class="mono">{{ inv.number }}</div><span class="pill status-{{ inv.status }}">{{ inv.status }}</span></div></div>
+<div class="grid grid-2 mt" style="margin-top:30px"><div><div class="muted small">Billed to</div><b>{{ inv.organization }}</b></div><div style="text-align:right"><div class="muted small">Issued: {{ inv.issued_on }}</div><div class="muted small">Due: {{ inv.due_on }}</div></div></div>
+<table class="table mt" style="margin-top:30px"><thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead><tbody><tr><td>{{ inv.description or 'Services' }}</td><td class="mono" style="text-align:right">{{ inv.amount|inr }}</td></tr><tr><td style="text-align:right"><b>Total</b></td><td class="mono" style="text-align:right"><b>{{ inv.amount|inr }}</b></td></tr></tbody></table>
+<p class="muted small mt">Thank you for your business. Payments can be made via UPI, card or net banking from the Payments page.</p></div>
+{% endblock %}

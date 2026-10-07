@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}API Keys - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>API Keys</h1><p class="sub">Create keys for integrations. Keys are shown once and stored hashed.</p></div><button class="btn btn-primary btn-lg" onclick="FS.openModal('addModal')"><i data-lucide="plus"></i> Generate Key</button></div>
+{% if new_key %}<div class="card" style="border-color:var(--green);margin-bottom:16px"><b style="color:var(--green)">New key created — copy it now, it will not be shown again.</b><div class="row mt"><code class="mono" id="newKey" style="background:var(--surface-2);padding:10px 14px;border-radius:10px;flex:1;word-break:break-all">{{ new_key }}</code><button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('newKey').textContent);FS.toast('Copied')"><i data-lucide="copy"></i> Copy</button></div></div>{% endif %}
+<div class="grid" style="grid-template-columns:3fr 2fr;align-items:start">
+<div class="card" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Owner</th><th>Usage</th><th>Last used</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody>
+{% for k in keys %}<tr><td class="name">{{ k.name }}</td><td class="mono">{{ k.prefix }}…</td><td>{% for s in k.scopes.split(',') %}<span class="pill pill-primary">{{ s }}</span> {% endfor %}</td><td>{{ k.owner.name if k.owner else '-' }}</td><td>{{ k.usage_count }}</td><td class="muted small">{{ k.last_used|timeago if k.last_used else 'never' }}</td><td class="muted small">{{ k.expires_at.strftime('%Y-%m-%d') if k.expires_at else 'never' }}</td><td><span class="pill {{ 'pill-green' if k.is_active else 'pill-red' }}">{{ 'Active' if k.is_active else 'Revoked' }}</span></td>
+<td class="actions"><form method="post" action="{{ url_for('apikeys.revoke', kid=k.id) }}"><button class="btn btn-sm">{{ 'Revoke' if k.is_active else 'Enable' }}</button></form>{% if current_user.role == 'super_admin' %}<form method="post" action="{{ url_for('apikeys.delete', kid=k.id) }}" data-confirm="Delete key {{ k.name }}?"><button class="btn btn-icon"><i data-lucide="trash-2"></i></button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="9" class="empty">No API keys yet.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card"><h3>Quick start</h3><p class="muted small">Base URL: <code>{{ base_url }}/api/v1</code></p>
+<div class="code mt">curl {{ base_url }}/api/v1/leads \
+  -H "Authorization: Bearer fs_live_..."
+
+curl -X POST {{ base_url }}/api/v1/leads \
+  -H "X-API-Key: fs_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jane","phone":"+919999999999","source":"Website"}'</div>
+<h4 class="mt">Endpoints</h4>
+<table class="table small"><tbody>
+{% for m, p, s in [('GET','/ping','-'),('GET','/leads','read'),('POST','/leads','write'),('GET|PATCH','/leads/{id}','read'),('GET','/deals','read'),('POST','/deals','write'),('GET','/calls','read'),('POST','/calls','calls'),('GET','/products','read'),('GET','/agents','read'),('GET','/users','admin'),('GET','/stats','read')] %}<tr><td class="mono">{{ m }}</td><td class="mono">{{ p }}</td><td><span class="pill pill-gray">{{ s }}</span></td></tr>{% endfor %}</tbody></table>
+<p class="muted small mt">Inbound WhatsApp webhook: <code class="mono">POST /dashboard/whatsapp/webhook</code></p></div></div>
+
+<div class="modal-backdrop" id="addModal"><div class="modal"><div class="modal-head"><h3>Generate API Key</h3><button class="icon-btn" onclick="FS.closeModal('addModal')"><i data-lucide="x"></i></button></div>
+<form method="post" action="{{ url_for('apikeys.create') }}"><div class="field"><label>Name</label><input type="text" name="name" required placeholder="e.g. Zapier, Website form"></div><div class="field"><label>Scopes</label><div class="row">{% for s in scopes %}<label class="check"><input type="checkbox" name="scopes" value="{{ s }}" {{ 'checked' if s == 'read' }}> {{ s }}</label>{% endfor %}</div></div><div class="field"><label>Expires in (days, blank = never)</label><input type="number" name="expires_days" min="1" placeholder="90"></div>
+<div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('addModal')">Cancel</button><button class="btn btn-primary">Generate</button></div></form></div></div>
+{% endblock %}

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Forgot password - FastSales99{% endblock %}
+{% block content %}
+<div style="max-width:480px;margin:60px auto"><div class="card"><a class="brand" href="/"><span class="logo">G</span>Gen<em>ai</em>lakes</a><h2 class="mt">Reset your password</h2><p class="muted">Enter your account email. In demo mode the reset link appears below instead of being emailed.</p>
+<form method="post" class="mt"><div class="field"><label>Email</label><input type="email" name="email" required></div><button class="btn btn-primary" style="width:100%;justify-content:center">Generate reset link</button></form>
+{% if token %}<div class="alert alert-info mt"><a href="{{ url_for('auth.reset_password', token=token) }}">Open reset link</a></div>{% endif %}
+<p class="muted small mt"><a href="{{ url_for('auth.login') }}">← Back to sign in</a></p></div></div>
+{% endblock %}

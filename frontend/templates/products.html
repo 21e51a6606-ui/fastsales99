@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Products - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Products Dashboard</h1><p class="sub">Manage inventory, tracking, and product details.</p></div>{% if current_user.role in ('super_admin','admin') %}<button class="btn btn-primary btn-lg" onclick="FS.openModal('addModal')"><i data-lucide="plus"></i> Add Product</button>{% endif %}</div>
+<form method="get" class="card" style="margin-bottom:16px"><div class="row" style="margin-bottom:12px;font-weight:700"><i data-lucide="filter"></i> Filters &amp; Search</div>
+  <div class="grid grid-4" style="align-items:end"><div class="field" style="margin:0;grid-column:span 2"><label>Search Name / SKU</label><div class="search-box" style="width:100%"><i data-lucide="search"></i><input type="search" name="q" value="{{ q }}" placeholder="Search..."></div></div>
+  <div class="field" style="margin:0"><label>Status</label><select name="status" onchange="this.form.submit()"><option value="">All Status</option>{% for s in ['Active','Inactive'] %}<option {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}</select></div>
+  <div class="row" style="gap:8px"><div class="field" style="margin:0;flex:1"><label>Category</label><select name="category" onchange="this.form.submit()"><option value="">All Categories</option>{% for c in categories %}<option {{ 'selected' if cat == c }}>{{ c }}</option>{% endfor %}</select></div><a class="btn" href="{{ url_for('products.index') }}" style="margin-top:22px"><i data-lucide="refresh-cw"></i> Reset</a></div></div></form>
+<div class="card" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th></th><th>Product Name &amp; SKU</th><th>Category</th><th>Status</th><th>Price</th><th>Date Added</th><th>Team</th><th style="text-align:right">Actions</th></tr></thead><tbody>
+{% for p in products %}
+<tr><td><button class="btn btn-icon btn-ghost" onclick="toggleRow({{ p.id }})"><i data-lucide="chevron-right"></i></button></td>
+<td><div class="row"><span class="icon-bubble bub-red" style="width:34px;height:34px"><i data-lucide="package"></i></span><div><b>{{ p.name }}</b><div class="muted small"><i data-lucide="tag" style="width:12px"></i> SKU: {{ p.sku }}</div></div></div></td>
+<td><span class="pill pill-gray" style="background:#64748b;color:#fff">{{ p.category }}</span></td><td><span class="pill status-{{ p.status }}">{{ p.status }}</span></td><td class="mono">{{ p.price|inr }}</td>
+<td class="muted small">Created: {{ p.created_at.strftime('%Y-%m-%d') }}<br>Updated: {{ p.updated_at.strftime('%Y-%m-%d') }}</td><td>{{ p.team|length }} members</td>
+<td><div class="row" style="justify-content:flex-end">{% if current_user.role in ('super_admin','admin','manager') %}<button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="openTeam({{ p.id }}, {{ p.team|map(attribute='id')|list|tojson }})"><i data-lucide="users"></i> Assign Team</button>{% endif %}
+{% if current_user.role in ('super_admin','admin') %}<button class="btn btn-icon btn-ghost" onclick='editProduct({{ p.to_dict()|tojson }})'><i data-lucide="pencil"></i></button>{% endif %}
+{% if current_user.role == 'super_admin' %}<form method="post" action="{{ url_for('products.delete', pid=p.id) }}" data-confirm="Delete {{ p.name }}?"><button class="btn btn-icon btn-ghost" style="color:var(--red)"><i data-lucide="trash-2"></i></button></form>{% endif %}</div></td></tr>
+<tr class="hidden" id="row-{{ p.id }}"><td></td><td colspan="7" style="background:var(--surface-2)"><div class="grid grid-4"><div><div class="muted small">Description</div>{{ p.description or '-' }}</div><div><div class="muted small">Leads</div><b>{{ stats[p.id].leads }}</b></div><div><div class="muted small">Deals</div><b>{{ stats[p.id].deals }}</b></div><div><div class="muted small">AI Agents</div><b>{{ stats[p.id].agents }}</b></div></div><div class="row mt" style="gap:6px">{% for u in p.team %}<span class="pill pill-primary">{{ u.name }}</span>{% else %}<span class="muted small">No team assigned.</span>{% endfor %}</div></td></tr>
+{% else %}<tr><td colspan="8" class="empty">No products found.</td></tr>{% endfor %}</tbody></table></div></div>
+
+<div class="modal-backdrop" id="addModal"><div class="modal"><div class="modal-head"><h3>Add Product</h3><button class="icon-btn" onclick="FS.closeModal('addModal')"><i data-lucide="x"></i></button></div>
+<form method="post" action="{{ url_for('products.add') }}"><div class="grid grid-2"><div class="field"><label>Name</label><input type="text" name="name" required></div><div class="field"><label>SKU</label><input type="text" name="sku" required placeholder="GG-002"></div><div class="field"><label>Category</label><select name="category">{% for c in categories %}<option>{{ c }}</option>{% endfor %}</select></div><div class="field"><label>Status</label><select name="status"><option>Active</option><option>Inactive</option></select></div><div class="field span-2"><label>Price (₹)</label><input type="number" name="price" min="0" value="0"></div></div><div class="field"><label>Description</label><textarea name="description"></textarea></div>
+<div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('addModal')">Cancel</button><button class="btn btn-primary">Add Product</button></div></form></div></div>
+
+<div class="modal-backdrop" id="editModal"><div class="modal"><div class="modal-head"><h3>Edit Product</h3><button class="icon-btn" onclick="FS.closeModal('editModal')"><i data-lucide="x"></i></button></div>
+<form method="post" id="editForm"><div class="grid grid-2"><div class="field"><label>Name</label><input type="text" name="name" id="p_name" required></div><div class="field"><label>Price (₹)</label><input type="number" name="price" id="p_price" min="0"></div><div class="field"><label>Category</label><select name="category" id="p_cat">{% for c in categories %}<option>{{ c }}</option>{% endfor %}</select></div><div class="field"><label>Status</label><select name="status" id="p_status"><option>Active</option><option>Inactive</option></select></div></div><div class="field"><label>Description</label><textarea name="description" id="p_desc"></textarea></div>
+<div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('editModal')">Cancel</button><button class="btn btn-primary">Save</button></div></form></div></div>
+
+<div class="modal-backdrop" id="teamModal"><div class="modal"><div class="modal-head"><h3>Assign Team</h3><button class="icon-btn" onclick="FS.closeModal('teamModal')"><i data-lucide="x"></i></button></div>
+<form method="post" id="teamForm"><div style="max-height:360px;overflow:auto">{% for u in staff %}<label class="check" style="padding:8px 0;border-bottom:1px solid var(--border)"><input type="checkbox" name="user_ids" value="{{ u.id }}"> <span class="avatar soft" style="width:26px;height:26px;font-size:10px">{{ u.initials }}</span> {{ u.name }} <span class="muted small">— {{ u.role_label }}</span></label>{% endfor %}</div>
+<div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('teamModal')">Cancel</button><button class="btn btn-primary">Save Team</button></div></form></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+function toggleRow(id) { document.getElementById('row-' + id).classList.toggle('hidden'); }
+function editProduct(p) { editForm.action = `/products/${p.id}/update`; p_name.value = p.name; p_price.value = p.price; p_cat.value = p.category; p_status.value = p.status; p_desc.value = p.description || ''; FS.openModal('editModal'); }
+function openTeam(id, ids) { teamForm.action = `/products/${id}/team`; teamForm.querySelectorAll('input[type=checkbox]').forEach(c => c.checked = ids.includes(Number(c.value))); FS.openModal('teamModal'); }
+</script>
+{% endblock %}

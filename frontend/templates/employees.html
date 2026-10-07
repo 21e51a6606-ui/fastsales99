@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}FastSales99 - Sales Management{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="page-head" style="margin-bottom:10px"><div><h1>Employee Management</h1><p class="sub">Manage your organization's hierarchy and assign personnel.</p></div>
+    {% if current_user.role in ('super_admin','admin','manager') %}<button class="btn btn-primary btn-lg" onclick="FS.openModal('addModal')"><i data-lucide="user-plus"></i> ADD EMPLOYEE</button>{% endif %}</div>
+  <div class="row between">
+    <div class="tabs"><a href="{{ url_for('employees.index', tab='employees', q=q) }}" class="{{ 'active' if tab == 'employees' }}"><i data-lucide="list" style="width:14px"></i> EMPLOYEES</a><a href="{{ url_for('employees.index', tab='hierarchy', q=q) }}" class="{{ 'active' if tab == 'hierarchy' }}"><i data-lucide="network" style="width:14px"></i> HIERARCHY</a></div>
+    <form method="get" class="search-box" style="width:340px"><input type="hidden" name="tab" value="{{ tab }}"><i data-lucide="search"></i><input type="search" name="q" value="{{ q }}" placeholder="Search within organization..."></form>
+  </div>
+</div>
+
+{% macro node(u, depth) %}
+<div class="tree-node">
+  <div class="row">
+    <i data-lucide="chevron-down" style="color:var(--muted)"></i>
+    <span class="avatar soft lg">{{ u.initials }}</span>
+    <div style="flex:1"><div class="row" style="gap:8px"><b style="font-size:15px">{{ u.name }}</b><span class="pill pill-primary">{{ u.role_label|upper }}</span></div>
+      <div class="muted small" style="text-transform:uppercase;letter-spacing:.06em;font-weight:600"><i data-lucide="briefcase" style="width:12px"></i> {{ u.department }} &nbsp; <i data-lucide="users" style="width:12px"></i> {{ u.reports|length }} headcount &nbsp; · {{ stats[u.id].leads }} leads · {{ stats[u.id].deals }} deals</div></div>
+    <span class="pill {{ 'pill-green' if u.is_active else 'pill-red' }}">{{ 'ACTIVE' if u.is_active else 'INACTIVE' }}</span>
+    {% if current_user.role in ('super_admin','admin','manager','team_lead') %}<button class="btn btn-sm btn-ghost" style="color:var(--primary);letter-spacing:.06em" onclick="assignLead({{ u.id }}, '{{ u.name|e }}')">ASSIGN LEAD</button>{% endif %}
+    <button class="btn btn-icon btn-ghost" onclick="editUser({{ u.to_dict()|tojson|forceescape }})"><i data-lucide="more-horizontal"></i></button>
+  </div>
+  {% set kids = u.reports|selectattr('role', 'in', ['team_lead','sales_executive','manager'])|list %}
+  {% if kids %}<div class="tree-children">{% for k in kids|sort(attribute='name') %}{{ node(k, depth+1) }}{% endfor %}</div>
+  {% elif u.role in ('manager','team_lead') %}<div class="tree-empty">No team leads or agents assigned to this {{ u.role_label|lower }} yet.</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% if tab == 'hierarchy' %}
+<div class="card" style="margin-top:16px">
+  {% for m in managers %}{{ node(m, 0) }}{% else %}<div class="empty">No managers yet. Add one to start building the hierarchy.</div>{% endfor %}
+  {% if unplaced %}<h4 style="margin:18px 0 10px" class="muted">Unassigned staff</h4>{% for u in unplaced %}{{ node(u, 0) }}{% endfor %}{% endif %}
+</div>
+{% else %}
+<div class="card" style="margin-top:16px;padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Employee</th><th>Role</th><th>Department</th><th>Reports to</th><th>Leads</th><th>Deals</th><th>Calls</th><th>Status</th><th>Last login</th><th></th></tr></thead><tbody>
+{% for u in users %}<tr><td><div class="row"><span class="avatar soft">{{ u.initials }}</span><div><b>{{ u.name }}</b><div class="muted small">{{ u.email }}</div></div></div></td><td><span class="pill pill-primary">{{ u.role_label }}</span></td><td>{{ u.department }}</td><td>{{ u.manager.name if u.manager else '-' }}</td><td>{{ stats[u.id].leads }}</td><td>{{ stats[u.id].deals }}</td><td>{{ stats[u.id].calls }}</td>
+<td><span class="pill {{ 'pill-green' if u.is_active else 'pill-red' }}">{{ 'Active' if u.is_active else 'Inactive' }}</span></td><td class="muted small">{{ u.last_login|timeago if u.last_login else 'never' }}</td>
+<td class="actions">{% if current_user.role in ('super_admin','admin','manager') %}<button class="btn btn-icon neutral" onclick="editUser({{ u.to_dict()|tojson|forceescape }})"><i data-lucide="pencil"></i></button>{% endif %}
+{% if current_user.role in ('super_admin','admin') and u.id != current_user.id %}<button class="btn btn-icon neutral" title="Toggle active" onclick="toggleUser({{ u.id }})"><i data-lucide="power"></i></button>{% endif %}
+{% if current_user.role == 'super_admin' and u.id != current_user.id %}<form method="post" action="{{ url_for('employees.delete', uid=u.id) }}" data-confirm="Remove {{ u.name }}? Their leads will become unassigned."><button class="btn btn-icon"><i data-lucide="trash-2"></i></button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="10" class="empty">No employees found.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endif %}
+
+<div class="modal-backdrop" id="addModal"><div class="modal"><div class="modal-head"><h3>Add Employee</h3><button class="icon-btn" onclick="FS.closeModal('addModal')"><i data-lucide="x"></i></button></div>
+<form method="post" action="{{ url_for('employees.add') }}"><div class="grid grid-2"><div class="field"><label>Full name</label><input type="text" name="name" required></div><div class="field"><label>Email</label><input type="email" name="email" required></div><div class="field"><label>Phone</label><input type="tel" name="phone"></div><div class="field"><label>Department</label><input type="text" name="department" value="Sales"></div>
+<div class="field"><label>Role</label><select name="role">{% for r in roles if r != 'admin' or current_user.role == 'super_admin' %}<option value="{{ r }}">{{ ROLE_LABELS[r] }}</option>{% endfor %}</select></div><div class="field"><label>Reports to</label><select name="manager_id"><option value="">-</option>{% for u in users if u.role in ('manager','team_lead') %}<option value="{{ u.id }}">{{ u.name }} ({{ u.role_label }})</option>{% endfor %}</select></div>
+<div class="field span-2"><label>Temporary password</label><input type="text" name="password" value="welcome123"></div></div>
+<div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('addModal')">Cancel</button><button class="btn btn-primary">Add Employee</button></div></form></div></div>
+
+<div class="modal-backdrop" id="editModal"><div class="modal"><div class="modal-head"><h3>Edit Employee</h3><button class="icon-btn" onclick="FS.closeModal('editModal')"><i data-lucide="x"></i></button></div>
+<form method="post" id="editForm"><div class="grid grid-2"><div class="field"><label>Full name</label><input type="text" name="name" id="e_name" required></div><div class="field"><label>Phone</label><input type="tel" name="phone" id="e_phone"></div><div class="field"><label>Department</label><input type="text" name="department" id="e_dept"></div>
+<div class="field"><label>Role</label><select name="role" id="e_role">{% for r in roles if r != 'admin' or current_user.role == 'super_admin' %}<option value="{{ r }}">{{ ROLE_LABELS[r] }}</option>{% endfor %}</select></div><div class="field"><label>Reports to</label><select name="manager_id" id="e_mgr"><option value="">-</option>{% for u in users if u.role in ('manager','team_lead') %}<option value="{{ u.id }}">{{ u.name }} ({{ u.role_label }})</option>{% endfor %}</select></div><div class="field"><label>Reset password</label><input type="text" name="password" placeholder="leave blank to keep"></div></div>
+<div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('editModal')">Cancel</button><button class="btn btn-primary">Save</button></div></form></div></div>
+
+<div class="modal-backdrop" id="assignModal"><div class="modal"><div class="modal-head"><h3>Assign leads to <span id="a_name"></span></h3><button class="icon-btn" onclick="FS.closeModal('assignModal')"><i data-lucide="x"></i></button></div>
+<input type="hidden" id="a_id"><div class="field"><label>Number of unassigned leads to pull (highest priority first)</label><input type="number" id="a_count" value="10" min="1" max="500"></div>
+<div class="modal-foot"><button class="btn" onclick="FS.closeModal('assignModal')">Cancel</button><button class="btn btn-primary" onclick="doAssign()">Assign</button></div></div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+function editUser(u) { if ({{ 'false' if current_user.role in ('super_admin','admin','manager') else 'true' }}) return; document.getElementById('editForm').action = `/user-management/${u.id}/update`; e_name.value = u.name; e_phone.value = u.phone || ''; e_dept.value = u.department || ''; e_role.value = u.role; e_mgr.value = u.manager_id || ''; FS.openModal('editModal'); }
+async function toggleUser(id) { try { const r = await FS.post(`/user-management/${id}/toggle`, {}); FS.toast(r.is_active ? 'Activated' : 'Deactivated'); setTimeout(() => location.reload(), 400); } catch (e) { FS.toast(e.message); } }
+function assignLead(id, name) { a_id.value = id; a_name.textContent = name; FS.openModal('assignModal'); }
+async function doAssign() { try { const r = await FS.post(`/user-management/${a_id.value}/assign-lead`, { count: a_count.value }); FS.closeModal('assignModal'); FS.toast(`${r.assigned} leads assigned`); setTimeout(() => location.reload(), 500); } catch (e) { FS.toast(e.message); } }
+</script>
+{% endblock %}

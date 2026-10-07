@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Sign in - FastSales99{% endblock %}
+{% block content %}
+{% set sel = selected %}
+<div class="login" style="margin:-24px">
+  <div class="login-left">
+    <a class="brand" href="/"><span class="logo">G</span>Gen<em>ai</em>lakes</a>
+    <p class="muted" style="margin-top:10px;font-size:16px">Drag the wheel to select your role</p>
+    <div class="wheel" id="wheel">
+      <div class="center">FastSales<br>99</div>
+      {% for key, label, icon, desc in roles %}
+        <div class="role c-{{ key }} {{ 'active' if key == sel }}" data-role="{{ key }}" data-label="{{ label }}" data-desc="{{ desc }}" data-icon="{{ icon }}" style="--i:{{ loop.index0 }}"><i data-lucide="{{ icon }}" style="width:24px;height:24px"></i><span>{{ label }}</span></div>
+      {% endfor %}
+    </div>
+    <div class="role-banner" id="roleBanner">
+      <div class="ib"><i data-lucide="shield"></i></div>
+      <div><div style="font-weight:800;font-size:16px" id="bannerTitle">Super Admin</div><div class="muted" id="bannerDesc">Complete system control &amp; administration</div></div>
+    </div>
+    <p class="muted" style="text-align:center;margin-top:30px">Need help? <a href="{{ url_for('main.help_page') }}">Contact Support</a></p>
+  </div>
+  <div class="login-right">
+    <div class="login-card">
+      <div class="big-ic"><span><i data-lucide="shield"></i></span></div>
+      <h2 id="formTitle">Super Admin Login</h2>
+      <p class="muted" style="font-size:16px;margin-top:6px">Enter your credentials to access your portal</p>
+      <form method="post" action="{{ url_for('auth.login') }}{% if request.args.get('next') %}?next={{ request.args.get('next') }}{% endif %}">
+        <input type="hidden" name="role" id="roleInput" value="{{ sel }}">
+        <div class="field"><label>Email Address</label><div class="input-icon"><i data-lucide="mail" class="l"></i><input type="email" name="email" value="{{ email }}" placeholder="you@example.com" required></div></div>
+        <div class="field"><label>Password</label><div class="input-icon"><i data-lucide="lock" class="l"></i><input type="password" name="password" placeholder="••••••••" required id="pw"><button type="button" class="eye"><i data-lucide="eye"></i></button></div></div>
+        <div class="row between" style="margin-bottom:16px"><label class="check"><input type="checkbox" name="remember"> Remember me</label><a href="{{ url_for('auth.forgot_password') }}" style="color:#b91c1c">Forgot password?</a></div>
+        <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center" id="submitBtn">Sign In as <span id="btnRole">Super Admin</span> <i data-lucide="arrow-right"></i></button>
+      </form>
+      <p class="muted" style="margin-top:22px">Don't have an account? <a href="{{ url_for('auth.request_access') }}">Request Access</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  const roles=[...document.querySelectorAll('.wheel .role')], n=roles.length, R=170;
+  let activeIdx=roles.findIndex(r=>r.classList.contains('active')); if(activeIdx<0)activeIdx=0;
+  const colors={super_admin:'#b91c1c',admin:'#2563eb',manager:'#7c3aed',team_lead:'#0891b2',sales_executive:'#059669',customer:'#d97706'};
+  function layout(){
+    const w=document.getElementById('wheel'), cx=w.clientWidth/2, cy=w.clientHeight/2, rad=Math.min(cx,cy)-70;
+    roles.forEach((el,i)=>{ const a=((i-activeIdx)/n)*Math.PI*2; const x=cx+Math.cos(a)*rad-el.offsetWidth/2, y=cy+Math.sin(a)*rad-el.offsetHeight/2; el.style.left=x+'px'; el.style.top=y+'px'; });
+  }
+  function select(i){
+    activeIdx=i; roles.forEach((r,j)=>r.classList.toggle('active',j===i)); const el=roles[i];
+    const key=el.dataset.role, c=colors[key];
+    document.getElementById('roleInput').value=key; document.getElementById('bannerTitle').textContent=el.dataset.label;
+    document.getElementById('bannerDesc').textContent=el.dataset.desc; document.getElementById('formTitle').textContent=el.dataset.label+' Login';
+    document.getElementById('btnRole').textContent=el.dataset.label;
+    const b=document.getElementById('roleBanner'); b.style.background=c+'1a'; b.querySelector('.ib').style.background=c;
+    b.querySelector('.ib').innerHTML='<i data-lucide="'+el.dataset.icon+'"></i>';
+    const bi=document.querySelector('.login-card .big-ic'); bi.style.background=c+'1a'; bi.querySelector('span').style.background=c; bi.querySelector('span').innerHTML='<i data-lucide="'+el.dataset.icon+'"></i>';
+    document.getElementById('submitBtn').style.background=c; document.getElementById('submitBtn').style.borderColor=c;
+    lucide.createIcons(); layout();
+  }
+  roles.forEach((r,i)=>r.addEventListener('click',()=>select(i)));
+  // drag to rotate
+  let dragging=false, startAngle=0;
+  const w=document.getElementById('wheel');
+  function ang(e){const r=w.getBoundingClientRect();const p=e.touches?e.touches[0]:e;return Math.atan2(p.clientY-(r.top+r.height/2),p.clientX-(r.left+r.width/2));}
+  w.addEventListener('mousedown',e=>{if(e.target.closest('.role'))return;dragging=true;startAngle=ang(e);});
+  window.addEventListener('mousemove',e=>{if(!dragging)return;const d=ang(e)-startAngle;if(Math.abs(d)>Math.PI/n){select((activeIdx+(d>0?-1:1)+n)%n);startAngle=ang(e);}});
+  window.addEventListener('mouseup',()=>dragging=false);
+  w.addEventListener('wheel',e=>{e.preventDefault();select((activeIdx+(e.deltaY>0?1:-1)+n)%n);},{passive:false});
+  window.addEventListener('resize',layout);
+  select(activeIdx);
+})();
+</script>
+{% endblock %}

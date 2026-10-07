@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" data-theme="{{ 'dark' if current_user and current_user.pref_dark else 'light' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FastSales99 - Sales Management{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script>try{var t=localStorage.getItem('fs-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+{% set nav_items = [
+  ('main.dashboard', 'Dashboard', 'shield', ['super_admin','admin','manager','team_lead','sales_executive','customer']),
+  ('deals.index', 'Deals', 'trending-up', ['super_admin','admin','manager','team_lead','sales_executive']),
+  ('employees.index', 'Employees', 'users', ['super_admin','admin','manager','team_lead']),
+  ('leads.index', 'Lead Assignment', 'target', ['super_admin','admin','manager','team_lead','sales_executive']),
+  ('products.index', 'Products', 'package', ['super_admin','admin','manager','team_lead','sales_executive','customer']),
+  ('agents.index', 'AI Agents', 'headphones', ['super_admin','admin','manager']),
+  ('apikeys.index', 'API Keys', 'key-round', ['super_admin','admin']),
+  ('payments.index', 'Payments', 'credit-card', ['super_admin','admin','manager']),
+  ('analytics.index', 'Analytics', 'bar-chart-3', ['super_admin','admin','manager','team_lead']),
+  ('audit.index', 'Audit Logs', 'activity', ['super_admin','admin','manager']),
+  ('campaigns.index', 'Campaigns', 'megaphone', ['super_admin','admin','manager']),
+  ('whatsapp.index', 'WhatsApp', 'message-square', ['super_admin','admin','manager','team_lead','sales_executive']),
+  ('whatsapp.web_automation', 'Web Automation WA', 'message-circle', ['super_admin','admin']),
+] %}
+{% if current_user %}
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="{{ url_for('main.dashboard') }}"><span class="logo">G</span>Gen<em>ai</em>lakes</a>
+    <div class="spacer"></div>
+    <div class="search-box"><i data-lucide="search"></i><input id="globalSearch" type="search" placeholder="Search..." aria-label="Search"></div>
+    <a class="wallet-chip" href="{{ url_for('payments.index', tab='wallet') }}"><i data-lucide="wallet"></i> WALLET <span>₹{{ '%.2f'|format(current_user.wallet_balance or 0) }}</span></a>
+    <button class="icon-btn" id="refreshBtn" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+    <a class="icon-btn" href="{{ url_for('main.notifications') }}" title="Notifications"><i data-lucide="bell"></i>{% if unread_notifications %}<span class="dot"></span>{% endif %}</a>
+    <button class="icon-btn" id="themeToggle" title="Toggle theme"><i data-lucide="moon"></i></button>
+    <div class="user-menu" id="userMenu">
+      <span class="avatar">{{ current_user.initials }}</span><span>{{ current_user.name }}</span><i data-lucide="chevron-down" style="width:16px"></i>
+      <div class="dropdown">
+        <div style="padding:8px 12px" class="small muted">{{ current_user.email }}<br><b>{{ current_user.role_label }}</b></div>
+        <a href="{{ url_for('main.profile') }}"><i data-lucide="user"></i> Profile</a>
+        <a href="{{ url_for('main.settings') }}"><i data-lucide="settings"></i> Settings</a>
+        <a href="{{ url_for('main.help_page') }}"><i data-lucide="life-buoy"></i> Help & Support</a>
+        <form method="post" action="{{ url_for('auth.logout') }}"><button type="submit"><i data-lucide="log-out"></i> Sign out</button></form>
+      </div>
+    </div>
+  </div>
+  <nav class="nav">
+    {% for ep, label, icon, roles in nav_items if current_user.role in roles %}
+      <a href="{{ url_for(ep) }}" class="{{ 'active' if request.endpoint and request.endpoint.split('.')[0] == ep.split('.')[0] and (ep != 'whatsapp.web_automation' and request.endpoint != 'whatsapp.web_automation' or ep == request.endpoint) }}"><i data-lucide="{{ icon }}"></i> {{ label }}</a>
+    {% endfor %}
+    <a class="more" href="{{ url_for('main.settings') }}"><i data-lucide="more-vertical"></i> More</a>
+  </nav>
+</header>
+{% endif %}
+<div class="flash-stack">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}<div class="alert alert-{{ cat }}"><i data-lucide="{{ 'check-circle' if cat == 'success' else ('alert-triangle' if cat in ('warning','danger') else 'info') }}"></i><span>{{ msg }}</span></div>{% endfor %}
+  {% endwith %}
+</div>
+<main class="page">{% block content %}{% endblock %}</main>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

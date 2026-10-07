@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Set new password - FastSales99{% endblock %}
+{% block content %}
+<div style="max-width:480px;margin:60px auto"><div class="card"><h2>Choose a new password</h2>
+<form method="post" class="mt"><div class="field"><label>New password</label><input type="password" name="password" required minlength="6"></div><div class="field"><label>Confirm</label><input type="password" name="confirm" required></div><button class="btn btn-primary" style="width:100%;justify-content:center">Update password</button></form></div></div>
+{% endblock %}

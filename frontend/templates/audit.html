@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1 style="font-size:36px">Audit Logs</h1><p class="sub" style="font-size:16px">Monitor and track all system activities and user actions</p></div></div>
+<form method="get" class="card" style="margin-bottom:16px"><h3 style="margin-bottom:12px">Filters</h3>
+<div class="row"><div class="search-box" style="flex:1"><i data-lucide="search"></i><input type="search" name="q" value="{{ args.get('q','') }}" placeholder="Search logs by user, email, or details..."></div>
+<select name="action" style="width:180px" onchange="this.form.submit()"><option value="">ACTIVITY TYPE</option>{% for a in actions %}<option {{ 'selected' if args.get('action') == a }}>{{ a }}</option>{% endfor %}</select>
+<select name="user" style="width:180px" onchange="this.form.submit()"><option value="">USERS</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if args.get('user')|int == u.id }}>{{ u.name }}</option>{% endfor %}</select>
+<select name="period" style="width:150px" onchange="this.form.submit()"><option value="">PERIOD</option>{% for p, l in [('1','Last 24h'),('7','Last 7 days'),('30','Last 30 days'),('90','Last 90 days')] %}<option value="{{ p }}" {{ 'selected' if args.get('period') == p }}>{{ l }}</option>{% endfor %}</select><button class="btn">Apply</button></div></form>
+<div class="card" style="padding:0"><div class="card-head" style="padding:20px"><h3>Activity Logs</h3>{% if current_user.role in ('super_admin','admin') %}<a class="btn" href="{{ url_for('audit.export', **args) }}"><i data-lucide="download"></i> Export</a>{% endif %}</div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Event Details</th><th>Action Type</th><th>Timestamp</th><th>User Identity</th><th>Role</th><th>Meta</th></tr></thead><tbody>
+{% for r in rows %}<tr><td><div style="font-weight:700;font-size:15px">{{ r.title }}</div><div class="row small mono" style="gap:6px;margin-top:6px"><span class="pill pill-gray"><i data-lucide="network" style="width:12px"></i> {{ r.ip or '-' }}</span>{% if r.user %}<span class="pill pill-gray">USER #{{ '%08X'|format(r.user.id * 2654435761 % 4294967296) }}</span>{% endif %}</div>{% if r.details %}<div class="muted small" style="margin-top:4px">{{ r.details }}</div>{% endif %}</td>
+<td><b class="small" style="letter-spacing:.08em">{{ r.action }}</b></td><td class="mono">{{ r.created_at.strftime('%m/%d/%Y') }}<br><span class="muted">{{ r.created_at.strftime('%I:%M:%S %p') }}</span></td>
+<td>{% if r.user %}<div class="row"><span class="avatar" style="background:var(--green-50);color:var(--green)">{{ r.user.initials }}</span><div><b>{{ r.user.name }}</b><div class="muted small">{{ r.user.email }}</div></div></div>{% else %}<span class="muted">system</span>{% endif %}</td>
+<td>{% if r.user %}<span class="pill pill-gray" style="letter-spacing:.08em">{{ r.user.role_label|upper }}</span>{% endif %}</td><td class="mono muted">#{{ r.public_id }}</td></tr>
+{% else %}<tr><td colspan="6" class="empty">No activity matches your filters.</td></tr>{% endfor %}</tbody></table></div>
+<div class="pagination" style="padding:14px 20px">{% set a = args.to_dict() %}{% if pagination.has_prev %}<a href="{{ url_for('audit.index', page=pagination.prev_num, **a) }}">‹ Prev</a>{% endif %}<span class="muted">Page {{ pagination.page }} / {{ pagination.pages or 1 }} · {{ pagination.total }} events</span>{% if pagination.has_next %}<a href="{{ url_for('audit.index', page=pagination.next_num, **a) }}">Next ›</a>{% endif %}</div></div>
+{% endblock %}

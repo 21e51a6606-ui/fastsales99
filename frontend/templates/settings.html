@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Settings - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1 style="font-size:34px">Settings</h1><p class="sub" style="font-size:16px">Manage your account preferences and configurations</p></div><button class="btn btn-primary btn-lg" onclick="document.querySelector('form.pref')?.requestSubmit()"><i data-lucide="save"></i> Save Changes</button></div>
+{% set is_admin = current_user.role in ('super_admin','admin') %}
+<div class="tabs full blue" style="margin-bottom:20px">{% for t, l in [('security','Security'),('notifications','Notifications'),('privacy','Privacy'),('appearance','Appearance'),('communication','Communication'),('facebook','Facebook Leads')] + ([('targets','Targets & Org')] if is_admin else []) %}<a href="?tab={{ t }}" class="{{ 'active' if tab == t }}">{{ l }}</a>{% endfor %}</div>
+
+{% if tab == 'security' %}
+<div class="card"><h2><i data-lucide="shield"></i> Security &amp; Access</h2>
+<div class="card mt"><h3><i data-lucide="key-round" style="color:var(--red)"></i> Change Password</h3>
+<form method="post" action="{{ url_for('main.change_password') }}" class="mt" id="pwForm">
+  <div class="field"><label>Current Password</label><div class="row"><div class="input-icon" style="flex:1"><input type="password" name="current" id="cur" placeholder="Enter your current password" required><button type="button" class="eye"><i data-lucide="eye"></i></button></div><button type="button" class="btn" id="verifyBtn" disabled>Verify</button></div></div>
+  <div class="field"><label>New Password</label><div class="input-icon"><input type="password" name="new" id="new" placeholder="Enter your new password" disabled><button type="button" class="eye"><i data-lucide="eye"></i></button></div></div>
+  <div class="field"><label>Confirm New Password</label><input type="password" name="confirm" id="conf" placeholder="Repeat your new password" disabled></div>
+  <button class="btn btn-lg" style="width:100%;justify-content:center" id="updBtn" disabled>Update Password</button><p class="muted small mt" id="pwHint">Verify your current password to enable password change.</p></form></div>
+<div class="card mt"><h3>Sessions</h3><p class="muted small">Last login: {{ current_user.last_login|dt if current_user.last_login else '-' }} · Role: {{ current_user.role_label }}</p><form method="post" action="{{ url_for('auth.logout') }}" class="mt"><button class="btn">Sign out of this session</button></form></div></div>
+
+{% elif tab == 'notifications' %}
+<form method="post" action="{{ url_for('main.save_preferences') }}" class="card pref"><input type="hidden" name="tab" value="notifications"><h2>Notification preferences</h2>
+{% for k, l, d in [('notify_email','Email notifications','Daily digest, assignments and invoice reminders', ),('notify_sms','SMS alerts','Critical alerts such as failed payments'),('notify_push','In-app notifications','Bulletins, assignments and call outcomes')] %}
+<label class="row between mt" style="border:1px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer"><div><b>{{ l }}</b><div class="muted small">{{ d }}</div></div><input type="checkbox" name="{{ k }}" {{ 'checked' if current_user['pref_' ~ k] }}></label>{% endfor %}
+<button class="btn btn-primary mt">Save</button></form>
+
+{% elif tab == 'privacy' %}
+<form method="post" action="{{ url_for('main.save_preferences') }}" class="card pref"><input type="hidden" name="tab" value="privacy"><h2>Privacy</h2>
+<div class="field mt"><label>Profile visibility</label><select name="profile_visibility">{% for v, l in [('everyone','Everyone in the organization'),('team','My team and managers'),('private','Only admins')] %}<option value="{{ v }}" {{ 'selected' if current_user.pref_privacy_profile == v }}>{{ l }}</option>{% endfor %}</select></div>
+<p class="muted small">Call recordings and transcripts are retained for 90 days and visible to management roles only.</p><button class="btn btn-primary mt">Save</button></form>
+
+{% elif tab == 'appearance' %}
+<form method="post" action="{{ url_for('main.save_preferences') }}" class="card pref"><input type="hidden" name="tab" value="appearance"><h2>Appearance</h2>
+<div class="row mt">{% for v, l in [('light','Light'),('dark','Dark')] %}<label class="card" style="cursor:pointer;flex:1"><input type="radio" name="theme" value="{{ v }}" {{ 'checked' if (current_user.pref_dark and v == 'dark') or (not current_user.pref_dark and v == 'light') }} onchange="document.documentElement.setAttribute('data-theme','{{ v }}');try{localStorage.setItem('fs-theme','{{ v }}')}catch(e){}"> <b>{{ l }}</b><div class="muted small">{{ 'Bright surfaces, best for daytime.' if v == 'light' else 'Dimmed surfaces, easier on the eyes.' }}</div></label>{% endfor %}</div>
+<button class="btn btn-primary mt">Save</button></form>
+
+{% elif tab == 'communication' %}
+<form method="post" action="{{ url_for('main.save_preferences') }}" class="card pref"><input type="hidden" name="tab" value="communication"><h2>Communication</h2>
+<div class="field mt"><label>Preferred channel for lead follow-ups</label><select name="channel">{% for v in ['whatsapp','call','email','sms'] %}<option value="{{ v }}" {{ 'selected' if current_user.pref_comm_channel == v }}>{{ v|title }}</option>{% endfor %}</select></div>
+{% if is_admin %}<h3 class="mt">WhatsApp providers</h3><div class="grid grid-2"><div class="field"><label>Wacto API key</label><input type="password" name="wacto_api_key" value="{{ org.wacto_api_key }}" placeholder="wacto_..."></div><div class="field"><label>Meta / Twilio token</label><input type="password" name="meta_token" value="{{ org.meta_token }}" placeholder="EAAG..."></div></div><p class="muted small">Provider health on the WhatsApp dashboard turns green once a key is saved.</p>{% endif %}
+<button class="btn btn-primary mt">Save</button></form>
+
+{% elif tab == 'facebook' %}
+<form method="post" action="{{ url_for('main.save_preferences') }}" class="card pref"><input type="hidden" name="tab" value="facebook"><h2><i data-lucide="facebook"></i> Facebook Lead Ads</h2><p class="muted">Pull leads from Facebook Lead Ads forms directly into Incoming Leads.</p>
+{% if is_admin %}<div class="grid grid-3 mt"><div class="field"><label>Page ID</label><input type="text" name="fb_page_id" value="{{ org.fb_page_id }}"></div><div class="field"><label>Form ID</label><input type="text" name="fb_form_id" value="{{ org.fb_form_id }}"></div><div class="field"><label>Access token</label><input type="password" name="fb_access_token" value="{{ org.fb_access_token }}"></div></div>
+<p class="muted small">Webhook URL for Facebook: <code class="mono">{{ request.host_url }}api/v1/leads</code> (use an API key with <b>write</b> scope).</p><button class="btn btn-primary mt">Save</button>{% else %}<p class="muted mt">Only administrators can configure integrations.</p>{% endif %}</form>
+
+{% elif tab == 'targets' and is_admin %}
+<form method="post" action="{{ url_for('main.save_preferences') }}" class="card pref"><input type="hidden" name="tab" value="targets"><h2>Organization &amp; targets</h2>
+<div class="grid grid-3 mt"><div class="field"><label>Organization name</label><input type="text" name="org_name" value="{{ org.org_name or 'GenAIlakes' }}"></div><div class="field"><label>Monthly call target</label><input type="number" name="call_target" value="{{ org.call_target or 5000 }}"></div><div class="field"><label>Monthly conversion target</label><input type="number" name="conversion_target" value="{{ org.conversion_target or 100 }}"></div></div>
+<button class="btn btn-primary">Save</button></form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+const cur = document.getElementById('cur');
+if (cur) {
+  cur.addEventListener('input', () => verifyBtn.disabled = !cur.value);
+  verifyBtn.addEventListener('click', async () => { const r = await FS.post('/settings/verify-password', { password: cur.value }); if (r.ok) { ['new', 'conf', 'updBtn'].forEach(i => document.getElementById(i).disabled = false); updBtn.classList.add('btn-primary'); pwHint.textContent = 'Verified. Enter your new password.'; verifyBtn.textContent = 'Verified'; verifyBtn.disabled = true; } else { pwHint.textContent = 'Current password is incorrect.'; pwHint.style.color = 'var(--red)'; } });
+}
+</script>
+{% endblock %}

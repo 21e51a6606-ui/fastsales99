@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Web Automation WA - FastSales99{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>WhatsApp Web Automation</h1><p class="sub">Pair a WhatsApp number to sync live conversations and let AI agents auto-respond.</p></div></div>
+<div class="grid grid-2">
+  <div class="card"><h3>Session</h3>
+    {% if session_row and session_row.status == 'Connected' %}
+      <div class="row mt"><span class="icon-bubble bub-green"><i data-lucide="smartphone"></i></span><div><b>{{ session_row.label or 'Business number' }}</b><div class="mono small">{{ session_row.phone }}</div><div class="muted small">Connected {{ session_row.connected_at|timeago }} · {{ session_row.provider }}</div></div><span class="pill pill-green" style="margin-left:auto">Connected</span></div>
+      <div class="row mt"><a class="btn btn-primary" href="{{ url_for('whatsapp.chat') }}"><i data-lucide="message-square"></i> Open live inbox</a>{% if current_user.role in ('super_admin','admin') %}<form method="post" action="{{ url_for('whatsapp.wa_disconnect') }}"><button class="btn">Disconnect</button></form>{% endif %}</div>
+    {% else %}
+      <p class="muted mt">No session connected. Scan the QR code with WhatsApp → Linked devices, then confirm the number below.</p>
+      <div class="mt" style="width:220px;height:220px;border:1px solid var(--border);border-radius:12px;display:grid;place-items:center;background:repeating-conic-gradient(var(--surface-2) 0 25%, var(--surface) 0 50%) 0 0/20px 20px"><i data-lucide="qr-code" style="width:64px;height:64px;color:var(--muted)"></i></div>
+      {% if current_user.role in ('super_admin','admin') %}<form method="post" action="{{ url_for('whatsapp.wa_connect') }}" class="mt"><div class="grid grid-2"><div class="field"><label>Phone number</label><input type="tel" name="phone" value="{{ session_row.phone if session_row else '' }}" required placeholder="+91..."></div><div class="field"><label>Label</label><input type="text" name="label" value="{{ session_row.label if session_row else 'Primary business number' }}"></div></div><button class="btn btn-primary"><i data-lucide="link"></i> Confirm pairing</button></form>{% endif %}
+    {% endif %}</div>
+  <div class="card"><h3>How it works</h3><ol class="muted" style="padding-left:18px;line-height:2"><li>Pair a WhatsApp number (QR pairing is simulated in this demo).</li><li>Inbound messages arrive via <code class="mono">POST /dashboard/whatsapp/webhook</code>.</li><li>Replies from the live inbox are logged and sent through the configured provider.</li><li>AI agents attached to a product can auto-respond to inbound messages.</li></ol>
+  <div class="code mt">curl -X POST {{ request.host_url }}dashboard/whatsapp/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"from":"+919630562821","text":"Interested, call me"}'</div></div>
+</div>
+{% endblock %}

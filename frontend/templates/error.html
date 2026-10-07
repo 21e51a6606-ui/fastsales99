@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} - FastSales99{% endblock %}
+{% block content %}
+<div class="card empty" style="padding:80px"><div style="font-size:64px;font-weight:800;color:var(--primary)">{{ code }}</div><p style="font-size:16px">{{ message }}</p><a class="btn btn-primary mt" href="{{ url_for('main.index') }}">Go to dashboard</a></div>
+{% endblock %}

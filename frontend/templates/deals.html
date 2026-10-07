@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Deals Pipeline - FastSales99{% endblock %}
+{% block content %}
+<div class="row between small muted" style="margin-bottom:14px"><span><a href="{{ url_for('main.dashboard') }}"><i data-lucide="arrow-left" style="width:14px"></i> Back to Dashboard</a> &nbsp;/&nbsp; Admin Portal &nbsp;/&nbsp; <b style="color:var(--primary)">Deals Pipeline</b></span><span><span style="color:var(--green)">●</span> Real-time Pipeline Sync</span></div>
+<div class="page-head">
+  <div class="row"><span class="icon-bubble bub-primary"><i data-lucide="trending-up"></i></span><div><h1>Deals Pipeline</h1><p class="sub">Enterprise revenue opportunities, sales forecasting, target tracking, and stage management.</p></div></div>
+  <div class="row">
+    <form method="get" class="row" id="perForm"><input type="hidden" name="view" value="{{ view }}"><label class="small muted">Cards/Col:</label><select name="per" style="width:90px" onchange="this.form.submit()">{% for n in [5,10,15,25,50] %}<option value="{{ n }}" {{ 'selected' if per_col == n }}>{{ n }}</option>{% endfor %}</select></form>
+    <button class="btn" id="kpiToggle"><i data-lucide="trending-up"></i> Hide KPIs</button>
+    <button class="btn" onclick="FS.openModal('guideModal')"><i data-lucide="help-circle"></i> Stage Guide</button>
+    <div class="btn-group primary"><a href="{{ url_for('deals.index', view='kanban', per=per_col, q=search, rep=sel_rep, stage=sel_stage, product=sel_product) }}" class="{{ 'active' if view == 'kanban' }}"><i data-lucide="kanban"></i> Kanban</a><a href="{{ url_for('deals.index', view='table', per=per_col, q=search, rep=sel_rep, stage=sel_stage, product=sel_product) }}" class="{{ 'active' if view == 'table' }}"><i data-lucide="table"></i> Table</a></div>
+    <button class="btn" onclick="FS.openModal('targetsModal')"><i data-lucide="users"></i> Team Targets &amp; Incentives <span class="pill pill-primary">{{ target_rows|length }}</span></button>
+    <button class="btn btn-icon" id="refreshBtn2" onclick="location.reload()"><i data-lucide="refresh-cw"></i></button>
+    <button class="btn btn-primary" onclick="FS.openModal('newDealModal')"><i data-lucide="plus"></i> New Deal</button>
+  </div>
+</div>
+
+<div class="grid grid-5" id="kpiRow">
+  <div class="card kpi kpi-grad-1" style="min-height:120px"><div class="label">Total Pipeline <span class="icon-bubble bub-primary"><i data-lucide="indian-rupee"></i></span></div><div class="value mono" style="font-size:26px">{{ total_pipeline|inr }}</div><div class="muted small">{{ total_count }} Total Deals</div></div>
+  <div class="card kpi kpi-grad-2" style="min-height:120px"><div class="label">Weighted Forecast <span class="icon-bubble bub-blue"><i data-lucide="trending-up"></i></span></div><div class="value mono" style="font-size:26px">{{ weighted|inr }}</div><div class="muted small">Expected Conversion Revenue</div></div>
+  <div class="card kpi kpi-grad-3" style="min-height:120px"><div class="label">Win Rate <span class="icon-bubble bub-green"><i data-lucide="award"></i></span></div><div class="value mono" style="font-size:26px;color:var(--green)">{{ win_rate }}%</div><div class="muted small">{{ won_count }} Deals Won ({{ won_value|inr }})</div></div>
+  <div class="card kpi kpi-grad-4" style="min-height:120px"><div class="label">Closing This Month <span class="icon-bubble bub-amber"><i data-lucide="calendar"></i></span></div><div class="value mono" style="font-size:26px">{{ closing_value|inr }}</div><div class="muted small">{{ closing_count }} Deals Closing Soon</div></div>
+  <div class="card kpi kpi-grad-5" style="min-height:120px"><div class="label">Active Stages <span class="icon-bubble bub-primary"><i data-lucide="target"></i></span></div><div class="value mono" style="font-size:26px">{{ active_stages }} Stages</div><div class="muted small">From Qualification to Review</div></div>
+</div>
+
+<form method="get" class="card" style="margin:16px 0;padding:14px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+  <input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="per" value="{{ per_col }}">
+  <div class="search-box" style="width:520px;max-width:100%"><i data-lucide="search"></i><input type="search" name="q" value="{{ search }}" placeholder="Search deals by name, contact, company..."></div>
+  <div class="spacer" style="flex:1"></div>
+  <select name="rep" style="width:190px" onchange="this.form.submit()"><option value="">All Sales Reps</option>{% for r in reps %}<option value="{{ r.id }}" {{ 'selected' if sel_rep == r.id }}>{{ r.name }}</option>{% endfor %}</select>
+  <select name="stage" style="width:190px" onchange="this.form.submit()"><option value="">All Stages</option>{% for k,l,p in DEAL_STAGES %}<option value="{{ k }}" {{ 'selected' if sel_stage == k }}>{{ l }}</option>{% endfor %}</select>
+  <select name="product" style="width:190px" onchange="this.form.submit()"><option value="">All Products</option>{% for p in products %}<option value="{{ p.id }}" {{ 'selected' if sel_product == p.id }}>{{ p.name }}</option>{% endfor %}</select>
+  <button class="btn btn-sm">Apply</button>
+</form>
+
+{% if view == 'kanban' %}
+<div class="kanban" id="kanban">
+  {% for col in columns %}
+  <div class="kcol stage-{{ col.key }}">
+    <div class="kcol-head"><div class="t"><span>{{ col.label }} <span class="muted small" style="font-weight:500">({{ col.prob }}%)</span></span><span class="count">{{ '{:,}'.format(col.count) }}</span></div><div class="mono small">{{ col.value|inr }}</div></div>
+    <div class="kcol-body" data-stage="{{ col.key }}">
+      {% for d in col.deals %}
+      <div class="kcard" draggable="true" data-id="{{ d.id }}">
+        <div class="t"><span>{{ d.title }}</span><span class="v mono">{{ d.value|inr }}</span></div>
+        <div class="contact"><div class="row" style="gap:6px"><i data-lucide="user" style="width:14px"></i> <b>{{ d.contact_name }}</b></div>
+          <div class="ph"><span class="pill pill-primary" style="border:1px solid var(--primary)"><i data-lucide="phone" style="width:12px"></i> {{ d.contact_phone }}</span><button class="btn btn-xs" style="background:var(--purple);color:#fff;border-color:var(--purple)" onclick="openLog({{ d.id }}, '{{ d.contact_name|e }}')"><i data-lucide="phone-call" style="width:12px"></i> Log</button></div></div>
+        <div class="foot"><span><i data-lucide="clock" style="width:12px"></i> {{ d.probability }}%</span>
+          <select class="stage-select" data-id="{{ d.id }}" style="width:150px;padding:4px 24px 4px 8px;font-size:11px">{% for k,l,p in DEAL_STAGES %}<option value="{{ k }}" {{ 'selected' if k == d.stage }}>{{ l }}</option>{% endfor %}</select>
+          <button class="btn btn-xs btn-ghost" onclick="openDeal({{ d.id }})"><i data-lucide="chevron-right" style="width:14px"></i></button></div>
+      </div>
+      {% endfor %}
+      {% if not col.deals %}<div class="drop-hint">Drop deals here</div>{% endif %}
+      {% if col.count > col.deals|length %}<div class="muted small" style="text-align:center">+ {{ col.count - col.deals|length }} more (increase Cards/Col)</div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="padding:0"><div class="table-wrap"><table class="table"><thead><tr><th>Deal</th><th>Contact</th><th>Company</th><th>Product</th><th>Owner</th><th>Stage</th><th>Value</th><th>Weighted</th><th>Close</th><th></th></tr></thead><tbody>
+  {% for d in deals[:300] %}<tr><td class="name">{{ d.title }}</td><td>{{ d.contact_name }}<div class="muted small mono">{{ d.contact_phone }}</div></td><td>{{ d.company or '-' }}</td><td>{{ d.product.name if d.product else '-' }}</td><td>{{ d.owner.name if d.owner else '-' }}</td>
+  <td><select class="stage-select" data-id="{{ d.id }}" style="width:170px;padding:5px 24px 5px 8px;font-size:12px">{% for k,l,p in DEAL_STAGES %}<option value="{{ k }}" {{ 'selected' if k == d.stage }}>{{ l }}</option>{% endfor %}</select></td>
+  <td class="mono">{{ d.value|inr }}</td><td class="mono">{{ d.weighted|inr }}</td><td class="muted">{{ d.expected_close or '-' }}</td>
+  <td class="actions"><button class="btn btn-icon neutral" onclick="openDeal({{ d.id }})"><i data-lucide="eye"></i></button><button class="btn btn-icon neutral" onclick="openLog({{ d.id }}, '{{ d.contact_name|e }}')"><i data-lucide="phone-call"></i></button><button class="btn btn-icon" onclick="delDeal({{ d.id }})"><i data-lucide="trash-2"></i></button></td></tr>
+  {% else %}<tr><td colspan="10" class="empty">No deals match your filters.</td></tr>{% endfor %}
+</tbody></table></div>{% if deals|length > 300 %}<div class="muted small" style="padding:12px 20px">Showing first 300 of {{ deals|length }} deals. Use filters to narrow down.</div>{% endif %}</div>
+{% endif %}
+
+<!-- New deal modal -->
+<div class="modal-backdrop" id="newDealModal"><div class="modal"><div class="modal-head"><h3>New Deal</h3><button class="icon-btn" onclick="FS.closeModal('newDealModal')"><i data-lucide="x"></i></button></div>
+<form method="post" action="{{ url_for('deals.create') }}"><div class="grid grid-2">
+  <div class="field"><label>Contact name</label><input type="text" name="contact_name" required></div><div class="field"><label>Phone</label><input type="tel" name="contact_phone" placeholder="+91..."></div>
+  <div class="field"><label>Deal title</label><input type="text" name="title" placeholder="Defaults to '<contact> - Deal'"></div><div class="field"><label>Company</label><input type="text" name="company"></div>
+  <div class="field"><label>Value (₹)</label><input type="number" name="value" min="0" step="1" value="0"></div><div class="field"><label>Stage</label><select name="stage">{% for k,l,p in DEAL_STAGES %}<option value="{{ k }}">{{ l }} ({{ p }}%)</option>{% endfor %}</select></div>
+  <div class="field"><label>Product</label><select name="product_id"><option value="">-</option>{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div><div class="field"><label>Owner</label><select name="owner_id">{% for r in reps %}<option value="{{ r.id }}" {{ 'selected' if r.id == current_user.id }}>{{ r.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Expected close</label><input type="date" name="expected_close"></div></div>
+  <div class="field"><label>Notes</label><textarea name="notes"></textarea></div>
+  <div class="modal-foot"><button type="button" class="btn" onclick="FS.closeModal('newDealModal')">Cancel</button><button class="btn btn-primary">Create Deal</button></div></form></div></div>
+
+<!-- Log call modal -->
+<div class="modal-backdrop" id="logModal"><div class="modal"><div class="modal-head"><h3>Log Call — <span id="logName"></span></h3><button class="icon-btn" onclick="FS.closeModal('logModal')"><i data-lucide="x"></i></button></div>
+<input type="hidden" id="logDealId"><div class="field"><label>Outcome</label><select id="logStatus"><option>Connected</option><option>Failed</option><option>Busy</option><option>No Answer</option></select></div>
+<div class="field"><label>Duration (seconds)</label><input type="number" id="logDuration" value="120" min="0"></div><div class="field"><label>Notes</label><textarea id="logNotes"></textarea></div>
+<div class="modal-foot"><button class="btn" onclick="FS.closeModal('logModal')">Cancel</button><button class="btn btn-primary" onclick="submitLog()">Save Call</button></div></div></div>
+
+<!-- Deal detail modal -->
+<div class="modal-backdrop" id="dealModal"><div class="modal wide"><div class="modal-head"><h3 id="dealTitle">Deal</h3><button class="icon-btn" onclick="FS.closeModal('dealModal')"><i data-lucide="x"></i></button></div><div id="dealBody"></div></div></div>
+
+<!-- Targets modal -->
+<div class="modal-backdrop" id="targetsModal"><div class="modal wide"><div class="modal-head"><h3>Team Targets &amp; Incentives — {{ now.strftime('%B %Y') }}</h3><button class="icon-btn" onclick="FS.closeModal('targetsModal')"><i data-lucide="x"></i></button></div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Rep</th><th>Target</th><th>Achieved</th><th>Attainment</th><th>Incentive</th></tr></thead><tbody>
+{% for t in target_rows %}<tr><td class="name">{{ t.user.name }}<div class="muted small">{{ t.user.role_label }}</div></td><td class="mono">{{ t.target|inr }}</td><td class="mono">{{ t.achieved|inr }}</td><td style="min-width:160px"><div class="progress"><span style="width:{{ [t.pct,100]|min }}%"></span></div><span class="small muted">{{ t.pct }}%</span></td><td class="mono">{{ t.incentive|inr }} <span class="muted small">({{ t.incentive_pct }}%)</span></td></tr>{% else %}<tr><td colspan="5" class="empty">No targets set for this month.</td></tr>{% endfor %}
+</tbody></table></div>
+{% if current_user.role in ('super_admin','admin','manager','team_lead') %}
+<h4 style="margin:18px 0 8px">Set / update target</h4>
+<form method="post" action="{{ url_for('deals.save_target') }}" class="inline-form"><div class="field"><label>Rep</label><select name="user_id">{% for r in reps %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></div><div class="field"><label>Period</label><input type="month" name="period" value="{{ now.strftime('%Y-%m') }}"></div><div class="field"><label>Target (₹)</label><input type="number" name="target_amount" min="0" value="500000"></div><div class="field"><label>Incentive %</label><input type="number" name="incentive_pct" min="0" step="0.5" value="5"></div><button class="btn btn-primary">Save</button></form>
+{% endif %}</div></div>
+
+<!-- Stage guide -->
+<div class="modal-backdrop" id="guideModal"><div class="modal"><div class="modal-head"><h3>Stage Guide</h3><button class="icon-btn" onclick="FS.closeModal('guideModal')"><i data-lucide="x"></i></button></div>
+{% for k,l,p in DEAL_STAGES %}<div class="list-item"><span class="pill pill-primary">{{ p }}%</span><div><b>{{ l }}</b><div class="muted small">{{ {'qualification':'Lead has been contacted and basic fit confirmed.','needs_analysis':'Discovery done; pain points and budget captured.','value_proposition':'Solution mapped to needs; demo delivered.','proposal':'Commercial proposal or quote shared.','negotiation':'Terms under review; decision pending.','closed_won':'Payment received or contract signed.','closed_lost':'Prospect declined or went silent.'}[k] }}</div></div></div>{% endfor %}</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('kpiToggle').addEventListener('click', e => { const r = document.getElementById('kpiRow'); const h = r.classList.toggle('hidden'); e.currentTarget.innerHTML = (h ? '<i data-lucide="trending-up"></i> Show KPIs' : '<i data-lucide="trending-up"></i> Hide KPIs'); lucide.createIcons(); });
+async function moveStage(id, stage) { try { await FS.post(`/deals/${id}/stage`, { stage }); FS.toast('Deal moved to ' + stage.replace('_', ' ')); setTimeout(() => location.reload(), 500); } catch (e) { FS.toast(e.message); } }
+document.querySelectorAll('.stage-select').forEach(s => s.addEventListener('change', () => moveStage(s.dataset.id, s.value)));
+// drag & drop
+let dragId = null;
+document.querySelectorAll('.kcard').forEach(c => { c.addEventListener('dragstart', () => { dragId = c.dataset.id; c.style.opacity = .5; }); c.addEventListener('dragend', () => c.style.opacity = 1); });
+document.querySelectorAll('.kcol-body').forEach(b => {
+  b.addEventListener('dragover', e => { e.preventDefault(); b.classList.add('drag-over'); });
+  b.addEventListener('dragleave', () => b.classList.remove('drag-over'));
+  b.addEventListener('drop', e => { e.preventDefault(); b.classList.remove('drag-over'); if (dragId) moveStage(dragId, b.dataset.stage); });
+});
+function openLog(id, name) { document.getElementById('logDealId').value = id; document.getElementById('logName').textContent = name; FS.openModal('logModal'); }
+async function submitLog() { const id = document.getElementById('logDealId').value; try { await FS.post(`/deals/${id}/log-call`, { status: document.getElementById('logStatus').value, duration: document.getElementById('logDuration').value, notes: document.getElementById('logNotes').value }); FS.closeModal('logModal'); FS.toast('Call logged'); } catch (e) { FS.toast(e.message); } }
+async function openDeal(id) {
+  const r = await FS.get(`/deals/${id}`); const d = r.deal;
+  document.getElementById('dealTitle').textContent = d.title;
+  document.getElementById('dealBody').innerHTML = `<div class="grid grid-2"><div class="card" style="padding:14px"><div class="muted small">Contact</div><b>${FS.esc(d.contact_name)}</b><div class="mono small">${FS.esc(d.contact_phone || '')}</div><div class="muted small mt">Company</div><b>${FS.esc(d.company || '-')}</b></div>
+    <div class="card" style="padding:14px"><div class="muted small">Stage</div><b>${d.stage_label} (${d.probability}%)</b><div class="muted small mt">Value / Weighted</div><b class="mono">${FS.inr(d.value)} / ${FS.inr(d.weighted)}</b><div class="muted small mt">Owner · Product</div><b>${FS.esc(d.owner || '-')} · ${FS.esc(d.product || '-')}</b></div></div>
+    <form class="mt" onsubmit="return saveDeal(event, ${d.id})"><div class="grid grid-3"><div class="field"><label>Value</label><input type="number" name="value" value="${d.value}"></div><div class="field"><label>Expected close</label><input type="date" name="expected_close" value="${d.expected_close || ''}"></div><div class="field"><label>Company</label><input type="text" name="company" value="${FS.esc(d.company || '')}"></div></div><div class="field"><label>Notes</label><textarea name="notes">${FS.esc(r.notes || '')}</textarea></div><div class="row between"><button type="button" class="btn btn-danger btn-sm" onclick="delDeal(${d.id})"><i data-lucide="trash-2"></i> Delete</button><button class="btn btn-primary">Save changes</button></div></form>
+    <h4 class="mt">Recent calls</h4>${r.calls.length ? r.calls.map(c => `<div class="list-item"><span class="pill status-${c.status}">${c.status}</span><span>${c.duration}</span><span class="muted small" style="margin-left:auto">${FS.fmtDate(c.created_at)}</span></div>`).join('') : '<div class="muted small">No calls yet.</div>'}`;
+  lucide.createIcons(); FS.openModal('dealModal');
+}
+async function saveDeal(e, id) { e.preventDefault(); const f = new FormData(e.target); const data = Object.fromEntries(f.entries()); try { await FS.post(`/deals/${id}/update`, data); FS.toast('Saved'); setTimeout(() => location.reload(), 400); } catch (err) { FS.toast(err.message); } return false; }
+async function delDeal(id) { if (!confirm('Delete this deal?')) return; await FS.post(`/deals/${id}/delete`, {}); location.reload(); }
+</script>
+{% endblock %}
