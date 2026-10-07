@@ -66,7 +66,7 @@ To update: pull the new code into `/opt/fastsales99` and restart the service.
 3. Open the web ports in the cloud firewall: Networking -> Virtual Cloud Networks -> your VCN -> Subnet ->
    Default Security List -> Add Ingress Rule: Source `0.0.0.0/0`, protocol TCP, destination port `80`.
    Add another for port `443`.
-4. SSH in: `ssh -i path	o\key.key ubuntu@PUBLIC_IP`
+4. SSH in: `ssh -i C:\path\to\key.key ubuntu@PUBLIC_IP`
 5. On the server:
 
 ```bash
