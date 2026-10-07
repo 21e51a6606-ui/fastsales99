@@ -38,58 +38,30 @@ Set `SECRET_KEY` to a long random value in production.
 
 ## Deploy to a server
 
-Everything needed is in `deploy/`. Two options:
+### Free option: Render (app) + Neon (Postgres database). Only a GitHub login is needed.
 
-### Option A: Ubuntu VPS (Gunicorn + Nginx + systemd)
+1. **Database:** sign in at https://neon.tech with GitHub, create a project (any name, region Singapore or
+   closest to you). On the project dashboard click **Connect**, copy the connection string
+   (`postgresql://...neon.tech/neondb?sslmode=require`).
+2. **App:** sign in at https://render.com with GitHub. Click **New -> Blueprint**, pick the `fastsales99`
+   repo. Render reads `render.yaml` and asks for three values:
+   - `DATABASE_URL`: paste the Neon connection string
+   - `ADMIN_EMAIL` / `ADMIN_PASSWORD`: your Super Admin login
+3. Click **Apply**. The first build takes 3-5 minutes. Open the `https://fastsales99-xxxx.onrender.com` URL,
+   choose Super Admin on the wheel and sign in.
+4. After the first login, open the service's **Environment** tab and delete `ADMIN_PASSWORD`.
 
-```bash
-# on the server
-sudo mkdir -p /opt/fastsales99 && sudo chown $USER /opt/fastsales99
-# copy the project there (git clone, scp, rsync ...), then:
-cd /opt/fastsales99
-sudo bash deploy/install.sh          # installs deps, creates /etc/fastsales99.env
-sudo nano /etc/fastsales99.env       # set SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
-sudo bash deploy/install.sh          # second run: starts the service and configures Nginx
-```
+Free-tier behaviour: the app sleeps after 15 minutes without visitors and the next request takes
+30-60 s to wake it. Data lives in Neon, so nothing is lost. Every `git push` redeploys automatically.
 
-The app is then served on port 80. Point a domain at the server, set `server_name` in
-`/etc/nginx/sites-available/fastsales99`, and run `sudo certbot --nginx -d yourdomain.com` for HTTPS.
+### Paid / self-hosted options
 
-Useful commands: `sudo systemctl restart fastsales99`, `sudo journalctl -u fastsales99 -f`.
-To update: pull the new code into `/opt/fastsales99` and restart the service.
-
-### Option A2: Oracle Cloud Always Free VM (free forever)
-
-1. Sign up at https://cloud.oracle.com (card needed for verification only). Pick a home region close to you.
-2. Compute -> Instances -> Create instance. Image: **Ubuntu 22.04 or 24.04**. Shape: **VM.Standard.E2.1.Micro**
-   (Always Free) or Ampere A1. Download the SSH private key it generates. Note the public IP.
-3. Open the web ports in the cloud firewall: Networking -> Virtual Cloud Networks -> your VCN -> Subnet ->
-   Default Security List -> Add Ingress Rule: Source `0.0.0.0/0`, protocol TCP, destination port `80`.
-   Add another for port `443`.
-4. SSH in: `ssh -i C:\path\to\key.key ubuntu@PUBLIC_IP`
-5. On the server:
-
-```bash
-sudo mkdir -p /opt/fastsales99 && sudo chown ubuntu /opt/fastsales99
-git clone https://github.com/21e51a6606-ui/fastsales99.git /opt/fastsales99   # username + GitHub token when asked
-cd /opt/fastsales99
-sudo bash deploy/install.sh          # installs everything, creates /etc/fastsales99.env
-sudo nano /etc/fastsales99.env       # set SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD; Ctrl+O, Enter, Ctrl+X
-sudo bash deploy/install.sh          # second run starts the app
-```
-
-Open `http://PUBLIC_IP` in a browser and sign in as Super Admin. To update later:
-`cd /opt/fastsales99 && git pull && sudo systemctl restart fastsales99`.
-
-### Option B: Docker (any host, Render, Railway, Fly.io ...)
-
-```bash
-docker build -t fastsales99 .
-docker run -d -p 8000:8000 -v fastsales_data:/app/backend/instance   -e SECRET_KEY=... -e ADMIN_EMAIL=... -e ADMIN_PASSWORD=... fastsales99
-```
-
-Mount a persistent volume on `/app/backend/instance` or set `DATABASE_URL` to Postgres, otherwise the
-SQLite database is lost on redeploy.
+- **Any Docker host** (Railway, Fly.io, Render paid): `docker build -t fastsales99 .` and run with the same
+  environment variables. Without `DATABASE_URL` the app uses SQLite in `/app/backend/instance`; mount a
+  volume there to persist it.
+- **Ubuntu VPS** (Oracle Always Free, Hetzner, DigitalOcean ...): clone the repo to `/opt/fastsales99` and run
+  `sudo bash deploy/install.sh` twice (first run creates `/etc/fastsales99.env` for you to fill in, second run
+  starts Gunicorn behind Nginx as a systemd service). Oracle: also open ports 80/443 in the VCN security list.
 
 ### Environment variables
 

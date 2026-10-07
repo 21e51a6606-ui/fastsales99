@@ -20,6 +20,19 @@ def _create_admin(name, email, password, phone=None):
     return u
 
 
+def _database_url(instance_path):
+    """DATABASE_URL from the environment, else local SQLite. Hosted Postgres providers hand out
+    postgres:// or postgresql:// URLs; SQLAlchemy needs the psycopg driver named explicitly."""
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if not url:
+        return "sqlite:///" + os.path.join(instance_path, "fastsales.db")
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
 def create_app():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     frontend = os.path.join(os.path.dirname(base_dir), "frontend")
@@ -29,8 +42,7 @@ def create_app():
     os.makedirs(app.instance_path, exist_ok=True)
     app.config.update(
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-change-me"),
-        SQLALCHEMY_DATABASE_URI=os.environ.get(
-            "DATABASE_URL", "sqlite:///" + os.path.join(app.instance_path, "fastsales.db")),
+        SQLALCHEMY_DATABASE_URI=_database_url(app.instance_path),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         MAX_CONTENT_LENGTH=8 * 1024 * 1024,
         PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 14,

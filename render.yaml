@@ -1,24 +1,23 @@
-# Render Blueprint: https://render.com/docs/blueprint-spec
-# In Render: New -> Blueprint -> pick this repo. Fill ADMIN_EMAIL / ADMIN_PASSWORD when prompted.
+# Render Blueprint (free tier): https://render.com/docs/blueprint-spec
+# In Render: New -> Blueprint -> pick this repo. You will be asked for DATABASE_URL (from Neon),
+# ADMIN_EMAIL and ADMIN_PASSWORD.
 services:
   - type: web
     name: fastsales99
     runtime: docker
-    plan: starter            # persistent disks need a paid instance; free tier wipes SQLite on every deploy
-    region: singapore        # closest to India; change if you prefer
+    plan: free
+    region: singapore
     healthCheckPath: /api/v1/ping
-    disk:
-      name: fastsales-data
-      mountPath: /app/backend/instance
-      sizeGB: 1
     envVars:
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false          # paste the Neon connection string
       - key: ADMIN_NAME
         value: Administrator
       - key: ADMIN_EMAIL
-        sync: false          # you enter this in the Render dashboard
+        sync: false
       - key: ADMIN_PASSWORD
         sync: false
       - key: WEB_CONCURRENCY
-        value: "2"
+        value: "1"
